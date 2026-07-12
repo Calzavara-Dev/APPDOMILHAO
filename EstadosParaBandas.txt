@@ -1,0 +1,5 @@
+const [quantidadeCamadas, setQuantidadeCamadas] = useState(5);
+const [faixaPersonalizada, setFaixaPersonalizada] = useState(false);
+const [spreadMin, setSpreadMin] = useState(0);
+const [spreadMax, setSpreadMax] = useState(0);
+// ... outros estados

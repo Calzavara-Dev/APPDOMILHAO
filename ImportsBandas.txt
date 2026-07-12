@@ -1,0 +1,13 @@
+<BandasSpreadConfig
+  quantidadeCamadas={quantidadeCamadas}
+  setQuantidadeCamadas={setQuantidadeCamadas}
+  percentualBanda={percentualBanda}
+  estatisticas={estatisticas}
+  faixaPersonalizada={faixaPersonalizada}
+  setFaixaPersonalizada={setFaixaPersonalizada}
+  spreadMin={spreadMin}
+  setSpreadMin={setSpreadMin}
+  spreadMax={spreadMax}
+  setSpreadMax={setSpreadMax}
+  bandasSpread={bandasSpread}
+/>

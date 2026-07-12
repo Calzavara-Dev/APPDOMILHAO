@@ -1,0 +1,14 @@
+grafico atualizando de hora em hora e vai gerando a curva gaussiana mostrando os valores mais frequentes
+
+o grafico de distribuicao de spreads se alinha com a frequencia de spreads e forma a curva gaussiana
+
+pela curva, o grafico tem quie marcar o spread minimo e maximo dentro de 70% das ocorrencias
+
+ pode ate mostrar essa imagem, mas tem que deixar claro que o spread minimo é R$ XX,XX e o máximo foi R$ XX,XX
+
+a interface do app seria eu escolher 2 ações quaisquer.
+
+Escolher minha banda de frequência: 70%, 80%, etc...
+
+Dividir em quantas camadas eu quiser fazer o spread. Por exemplo de 1 a 2 reais, em 5 camadas seria de 20 em 20 centavos.
+

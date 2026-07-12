@@ -1,0 +1,407 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ───────────────────────────────────────────────
+   GOOGLE FONTS — Inter
+─────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+/* ───────────────────────────────────────────────
+   CSS TOKENS — Dark Financial Theme
+─────────────────────────────────────────────── */
+@layer base {
+  :root {
+    /* shadcn/ui token map → dark financial */
+    --background: 222 47% 5%;
+    --foreground: 210 40% 96%;
+
+    --card: 222 44% 8%;
+    --card-foreground: 210 40% 96%;
+
+    --popover: 222 44% 8%;
+    --popover-foreground: 210 40% 96%;
+
+    --primary: 199 89% 48%;
+    --primary-foreground: 222 47% 5%;
+
+    --secondary: 222 40% 14%;
+    --secondary-foreground: 210 40% 90%;
+
+    --muted: 222 35% 12%;
+    --muted-foreground: 215 20% 55%;
+
+    --accent: 199 89% 48%;
+    --accent-foreground: 222 47% 5%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 222 35% 16%;
+    --input: 222 35% 16%;
+    --ring: 199 89% 48%;
+
+    --radius: 0.75rem;
+
+    /* Financial custom tokens */
+    --color-long: 142 76% 45%;
+    --color-short: 0 72% 51%;
+    --color-neutral: 215 20% 55%;
+    --color-accent-cyan: 199 89% 48%;
+    --color-accent-violet: 263 70% 60%;
+    --color-accent-amber: 38 92% 50%;
+    --color-surface-1: 222 44% 8%;
+    --color-surface-2: 222 40% 11%;
+    --color-surface-3: 222 35% 14%;
+    --color-glow-cyan: 199 89% 48%;
+    --color-glow-violet: 263 70% 60%;
+  }
+}
+
+/* ───────────────────────────────────────────────
+   BASE RESETS
+─────────────────────────────────────────────── */
+@layer base {
+  * {
+    @apply border-border;
+    box-sizing: border-box;
+  }
+
+  html {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    background: hsl(222, 47%, 5%);
+    background-image:
+      radial-gradient(ellipse at 20% 0%, hsla(199, 89%, 48%, 0.08) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 100%, hsla(263, 70%, 60%, 0.06) 0%, transparent 50%),
+      linear-gradient(180deg, hsl(222, 47%, 5%) 0%, hsl(222, 50%, 4%) 100%);
+    min-height: 100vh;
+  }
+
+  /* Scrollbar personalizado */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: hsl(222, 44%, 8%);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(222, 35%, 22%);
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(199, 89%, 40%);
+  }
+}
+
+/* ───────────────────────────────────────────────
+   GLASSMORPHISM UTILITIES
+─────────────────────────────────────────────── */
+@layer components {
+  .glass {
+    background: hsla(222, 44%, 10%, 0.7);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    border: 1px solid hsla(210, 40%, 96%, 0.06);
+  }
+
+  .glass-strong {
+    background: hsla(222, 44%, 12%, 0.85);
+    backdrop-filter: blur(24px) saturate(200%);
+    -webkit-backdrop-filter: blur(24px) saturate(200%);
+    border: 1px solid hsla(210, 40%, 96%, 0.08);
+  }
+
+  /* ─── KPI Card ─── */
+  .kpi-card {
+    @apply glass rounded-2xl p-5 transition-all duration-300;
+    box-shadow:
+      0 0 0 1px hsla(210, 40%, 96%, 0.05),
+      0 4px 24px hsla(222, 47%, 3%, 0.5);
+  }
+  .kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      0 0 0 1px hsla(199, 89%, 48%, 0.25),
+      0 8px 32px hsla(199, 89%, 48%, 0.12),
+      0 4px 24px hsla(222, 47%, 3%, 0.6);
+  }
+
+  /* ─── Signal Badge ─── */
+  .signal-long {
+    color: hsl(142, 76%, 45%);
+    text-shadow: 0 0 20px hsla(142, 76%, 45%, 0.5);
+  }
+  .signal-short {
+    color: hsl(0, 72%, 60%);
+    text-shadow: 0 0 20px hsla(0, 72%, 60%, 0.5);
+  }
+  .signal-neutral {
+    color: hsl(215, 20%, 65%);
+  }
+
+  /* ─── Glow effects ─── */
+  .glow-cyan {
+    box-shadow: 0 0 20px hsla(199, 89%, 48%, 0.3), 0 0 60px hsla(199, 89%, 48%, 0.1);
+  }
+  .glow-violet {
+    box-shadow: 0 0 20px hsla(263, 70%, 60%, 0.3), 0 0 60px hsla(263, 70%, 60%, 0.1);
+  }
+  .glow-green {
+    box-shadow: 0 0 20px hsla(142, 76%, 45%, 0.3), 0 0 60px hsla(142, 76%, 45%, 0.1);
+  }
+  .glow-red {
+    box-shadow: 0 0 20px hsla(0, 72%, 51%, 0.3), 0 0 60px hsla(0, 72%, 51%, 0.1);
+  }
+
+  /* ─── Tab pill ─── */
+  .tab-active {
+    background: hsla(199, 89%, 48%, 0.15);
+    color: hsl(199, 89%, 65%);
+    border-color: hsl(199, 89%, 48%);
+    box-shadow: 0 0 16px hsla(199, 89%, 48%, 0.2);
+  }
+
+  /* ─── Section divider ─── */
+  .section-divider {
+    height: 1px;
+    background: linear-gradient(90deg,
+      transparent 0%,
+      hsla(199, 89%, 48%, 0.3) 30%,
+      hsla(263, 70%, 60%, 0.3) 70%,
+      transparent 100%
+    );
+  }
+
+  /* ─── Progress bar ─── */
+  .spread-bar {
+    height: 4px;
+    border-radius: 999px;
+    background: hsl(222, 35%, 18%);
+    overflow: hidden;
+  }
+  .spread-bar-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, hsl(199, 89%, 48%), hsl(263, 70%, 60%));
+    transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  /* ─── Badge variants ─── */
+  .badge-long {
+    background: hsla(142, 76%, 45%, 0.15);
+    color: hsl(142, 76%, 55%);
+    border: 1px solid hsla(142, 76%, 45%, 0.3);
+  }
+  .badge-short {
+    background: hsla(0, 72%, 51%, 0.15);
+    color: hsl(0, 72%, 65%);
+    border: 1px solid hsla(0, 72%, 51%, 0.3);
+  }
+  .badge-neutral {
+    background: hsla(215, 20%, 55%, 0.15);
+    color: hsl(215, 20%, 70%);
+    border: 1px solid hsla(215, 20%, 55%, 0.3);
+  }
+  .badge-real {
+    background: hsla(142, 76%, 45%, 0.15);
+    color: hsl(142, 76%, 55%);
+    border: 1px solid hsla(142, 76%, 45%, 0.3);
+  }
+  .badge-simulated {
+    background: hsla(38, 92%, 50%, 0.15);
+    color: hsl(38, 92%, 65%);
+    border: 1px solid hsla(38, 92%, 50%, 0.3);
+  }
+
+  /* ─── Occurrence card ─── */
+  .occ-card {
+    @apply glass rounded-xl p-4 transition-all duration-200;
+    border: 1px solid hsla(210, 40%, 96%, 0.05);
+  }
+  .occ-card:hover {
+    border-color: hsla(199, 89%, 48%, 0.3);
+    box-shadow: 0 0 20px hsla(199, 89%, 48%, 0.1);
+    transform: translateY(-1px);
+  }
+
+  /* ─── Input dark ─── */
+  .input-dark {
+    background: hsl(222, 40%, 10%);
+    border: 1px solid hsl(222, 35%, 18%);
+    color: hsl(210, 40%, 96%);
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    width: 100%;
+  }
+  .input-dark:focus {
+    outline: none;
+    border-color: hsl(199, 89%, 48%);
+    box-shadow: 0 0 0 3px hsla(199, 89%, 48%, 0.15);
+  }
+  .input-dark::placeholder {
+    color: hsl(215, 20%, 40%);
+  }
+
+  /* ─── Checkbox dark ─── */
+  .checkbox-dark {
+    accent-color: hsl(199, 89%, 48%);
+    width: 1rem;
+    height: 1rem;
+  }
+}
+
+/* ───────────────────────────────────────────────
+   KEYFRAME ANIMATIONS
+─────────────────────────────────────────────── */
+@layer utilities {
+  /* Fade + scale in */
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes slideInLeft {
+    from {
+      opacity: 0;
+      transform: translateX(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  /* Pulse glow for signal */
+  @keyframes pulseGlow {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+
+  /* Rotating gradient border */
+  @keyframes gradientSpin {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  /* Number counter shimmer */
+  @keyframes shimmer {
+    from { background-position: -200% center; }
+    to { background-position: 200% center; }
+  }
+
+  /* Dot pulse for live indicator */
+  @keyframes dotPulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.4); opacity: 0.7; }
+  }
+
+  .animate-fade-in-up {
+    animation: fadeInUp 0.5s cubic-bezier(0.34, 1.2, 0.64, 1) both;
+  }
+  .animate-fade-in {
+    animation: fadeIn 0.4s ease both;
+  }
+  .animate-slide-in-left {
+    animation: slideInLeft 0.4s ease both;
+  }
+  .animate-pulse-glow {
+    animation: pulseGlow 2s ease-in-out infinite;
+  }
+  .animate-dot-pulse {
+    animation: dotPulse 1.5s ease-in-out infinite;
+  }
+
+  /* Stagger delays */
+  .delay-100 { animation-delay: 0.1s; }
+  .delay-150 { animation-delay: 0.15s; }
+  .delay-200 { animation-delay: 0.2s; }
+  .delay-300 { animation-delay: 0.3s; }
+  .delay-400 { animation-delay: 0.4s; }
+  .delay-500 { animation-delay: 0.5s; }
+}
+
+/* ───────────────────────────────────────────────
+   RECHARTS — Dark Theme Overrides
+─────────────────────────────────────────────── */
+.recharts-cartesian-grid-horizontal line,
+.recharts-cartesian-grid-vertical line {
+  stroke: hsla(210, 40%, 96%, 0.05) !important;
+}
+
+.recharts-tooltip-wrapper .recharts-default-tooltip {
+  background: hsl(222, 44%, 10%) !important;
+  border: 1px solid hsla(210, 40%, 96%, 0.1) !important;
+  border-radius: 0.75rem !important;
+  box-shadow: 0 8px 32px hsla(222, 47%, 3%, 0.8) !important;
+}
+
+.recharts-legend-item-text {
+  color: hsl(215, 20%, 65%) !important;
+  font-size: 0.75rem !important;
+}
+
+.recharts-cartesian-axis-tick-value {
+  fill: hsl(215, 20%, 50%) !important;
+  font-size: 11px !important;
+  font-family: 'Inter', sans-serif !important;
+}
+
+/* ───────────────────────────────────────────────
+   SHADCN/RADIX — Dark Overrides
+─────────────────────────────────────────────── */
+
+/* Select content */
+[data-radix-select-content] {
+  background: hsl(222, 44%, 9%) !important;
+  border: 1px solid hsl(222, 35%, 18%) !important;
+  border-radius: 0.75rem !important;
+  box-shadow: 0 8px 40px hsla(222, 47%, 2%, 0.9) !important;
+}
+
+[data-radix-select-item]:hover,
+[data-radix-select-item][data-highlighted] {
+  background: hsla(199, 89%, 48%, 0.12) !important;
+  color: hsl(199, 89%, 65%) !important;
+}
+
+/* Accordion */
+[data-radix-accordion-content] {
+  overflow: hidden;
+}
+
+/* ───────────────────────────────────────────────
+   MOBILE OPTIMIZATIONS
+─────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .recharts-wrapper {
+    font-size: 11px;
+  }
+  .recharts-cartesian-axis-tick-value {
+    font-size: 9px !important;
+  }
+  .recharts-tooltip-wrapper {
+    font-size: 11px;
+  }
+}
