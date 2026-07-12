@@ -351,14 +351,12 @@ const calculateBandasCamadas = (
 // ─────────────────────────────────────────
 // TAB DEFINITIONS
 // ─────────────────────────────────────────
-type TabKey = 'resumo' | 'camadas' | 'ocorrencias' | 'estatisticas' | 'distribuicao' | 'historicos' | 'configuracoes';
+type TabKey = 'resumo' | 'camadas' | 'ocorrencias' | 'estatisticas' | 'configuracoes';
 const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
   { key: 'resumo', label: 'Resumo', icon: <Activity className="w-3.5 h-3.5" /> },
   { key: 'camadas', label: 'Bandas & Camadas', icon: <Layers className="w-3.5 h-3.5" /> },
   { key: 'ocorrencias', label: 'Ocorrências', icon: <Target className="w-3.5 h-3.5" /> },
   { key: 'estatisticas', label: 'Estatísticas', icon: <BarChart2 className="w-3.5 h-3.5" /> },
-  { key: 'distribuicao', label: 'Distribuição', icon: <Layers className="w-3.5 h-3.5" /> },
-  { key: 'historicos', label: 'Histórico', icon: <Clock className="w-3.5 h-3.5" /> },
   { key: 'configuracoes', label: 'Config', icon: <Settings className="w-3.5 h-3.5" /> },
 ];
 
@@ -1048,7 +1046,6 @@ function StockPairAnalyzer() {
               </span>
             ) : (
               <span className="flex gap-3">
-                <button onClick={() => setActiveTab('distribuicao')} className="text-cyan-400 hover:text-cyan-300 transition-colors">Distribuição</button>
                 <button onClick={() => setActiveTab('estatisticas')} className="text-violet-400 hover:text-violet-300 transition-colors">Stats</button>
               </span>
             )}
@@ -1325,99 +1322,7 @@ function StockPairAnalyzer() {
         </div>
       )}
 
-      {/* ════════════════════════════════════
-          TAB: HISTÓRICO
-      ════════════════════════════════════ */}
-      {activeTab === 'historicos' && (
-        <div className="animate-fade-in grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Preços */}
-          <div className="glass rounded-2xl p-6 border border-white/5">
-            <h3 className="text-sm font-bold text-white mb-4">Preços Históricos</h3>
-            <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={stock1Data}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsla(210,40%,96%,0.04)" />
-                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={v => { const d = new Date(v); return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }); }} />
-                  <YAxis domain={['auto', 'auto']} tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={v => `R$${v}`} />
-                  <Tooltip content={<ChartTooltip />} />
-                  <Legend wrapperStyle={{ fontSize: '11px', color: '#94a3b8' }} />
-                  <Line type="monotone" dataKey="price" name={`${stock1Symbol}`} stroke="#06b6d4" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
-                  <Line type="monotone" data={stock2Data} dataKey="price" name={`${stock2Symbol}`} stroke="#8b5cf6" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
 
-          {/* Spread */}
-          <div className="glass rounded-2xl p-6 border border-white/5">
-            <h3 className="text-sm font-bold text-white mb-4">Spread Histórico</h3>
-            <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={spreadData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsla(210,40%,96%,0.04)" />
-                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={v => { const d = new Date(v); return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }); }} />
-                  <YAxis domain={['auto', 'auto']} tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={v => `R$${v}`} />
-                  <Tooltip content={<ChartTooltip />} />
-                  <ReferenceLine y={0} stroke="#334155" strokeDasharray="3 3" />
-                  <ReferenceLine y={2} stroke="#ef4444" strokeDasharray="3 3" strokeOpacity={0.5} />
-                  <ReferenceLine y={-2} stroke="#ef4444" strokeDasharray="3 3" strokeOpacity={0.5} />
-                  <Line type="monotone" dataKey="spread" name="Spread" stroke="#f59e0b" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ════════════════════════════════════
-          TAB: DISTRIBUIÇÃO
-      ════════════════════════════════════ */}
-      {activeTab === 'distribuicao' && (
-        <div className="animate-fade-in grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Z-Score */}
-          <div className="glass rounded-2xl p-6 border border-white/5">
-            <h3 className="text-sm font-bold text-white mb-4">Z-Score Histórico</h3>
-            <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={spreadData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsla(210,40%,96%,0.04)" />
-                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={v => { const d = new Date(v); return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }); }} />
-                  <YAxis domain={[-3, 3]} tick={{ fontSize: 10, fill: '#64748b' }} tickCount={7} />
-                  <Tooltip content={<ChartTooltip />} />
-                  <ReferenceLine y={0} stroke="#334155" strokeDasharray="3 3" />
-                  <ReferenceLine y={2} stroke="#ef4444" strokeDasharray="3 3" strokeOpacity={0.6} label={{ value: '2σ', position: 'right', fill: '#ef4444', fontSize: 10 }} />
-                  <ReferenceLine y={-2} stroke="#ef4444" strokeDasharray="3 3" strokeOpacity={0.6} label={{ value: '-2σ', position: 'right', fill: '#ef4444', fontSize: 10 }} />
-                  <ReferenceLine y={1} stroke="#f97316" strokeDasharray="3 3" strokeOpacity={0.35} />
-                  <ReferenceLine y={-1} stroke="#f97316" strokeDasharray="3 3" strokeOpacity={0.35} />
-                  {rangeLines.map((y, idx) => (
-                    <ReferenceLine key={idx} y={y} stroke="#06b6d4" strokeDasharray="4 4" strokeOpacity={0.5} />
-                  ))}
-                  <Line type="monotone" dataKey="zScore" name="Z-Score" stroke="#f97316" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* Distribution Histogram */}
-          <div className="glass rounded-2xl p-6 border border-white/5">
-            <h3 className="text-sm font-bold text-white mb-4">Distribuição dos Spreads (Gaussiana)</h3>
-            <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={histogramData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsla(210,40%,96%,0.04)" />
-                  <XAxis dataKey="bin" tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={v => `${v}`} />
-                  <YAxis tick={{ fontSize: 10, fill: '#64748b' }} />
-                  <Tooltip content={<DistributionTooltip />} />
-                  <Legend wrapperStyle={{ fontSize: '11px', color: '#94a3b8' }} />
-                  <Bar dataKey="frequency" name="Frequência" fill="#8b5cf6" opacity={0.75} radius={[2, 2, 0, 0]} />
-                  <Line type="monotone" dataKey="normal" name="Curva Normal" stroke="#10b981" strokeWidth={2.5} dot={false} />
-                  <ReferenceLine x={latestSpread} stroke="#ef4444" strokeDasharray="3 3" label={{ value: 'Atual', position: 'top', fill: '#ef4444', fontSize: 10 }} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ════════════════════════════════════
           TAB: CONFIGURAÇÕES
