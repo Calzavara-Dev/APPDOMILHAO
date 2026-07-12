@@ -13,7 +13,7 @@ export const APP_CONFIG = {
 
     // Período de análise histórica
     HISTORICAL_PERIOD: {
-      DAYS: 100,               // Quantos dias de histórico analisar
+      DAYS: 60,                // Quantos dias de histórico analisar (3 meses B3)
       MIN_DAYS: 30,            // Mínimo de dias necessários
     },
 
@@ -105,6 +105,12 @@ export const APP_CONFIG = {
 
   // 🌐 CONFIGURAÇÕES DE API
   API: {
+    // brapi.dev (Ações Brasileiras - B3)
+    BRAPI: {
+      TOKEN: "tM1CShBhsaGYhJ1riPBGyE", // Token do usuário na brapi.dev
+      BASE_URL: "https://brapi.dev/api",
+    },
+
     // Alpha Vantage
     ALPHA_VANTAGE: {
       API_KEY: "95SH7ZOVB2X40ZF4", // Sua chave da API (atualizada)
@@ -246,7 +252,7 @@ export const ConfigUtils = {
   // Obter configuração aninhada
   get: (path: string, defaultValue?: any) => {
     const keys = path.split('.');
-    let value = APP_CONFIG;
+    let value: any = APP_CONFIG;
 
     for (const key of keys) {
       if (value && typeof value === 'object' && key in value) {
@@ -263,7 +269,7 @@ export const ConfigUtils = {
   set: (path: string, value: any) => {
     const keys = path.split('.');
     const lastKey = keys.pop()!;
-    let target = APP_CONFIG;
+    let target: any = APP_CONFIG;
 
     for (const key of keys) {
       if (!target[key] || typeof target[key] !== 'object') {

@@ -50,7 +50,7 @@ export default function BandasSpreadConfig({
               <Input
                 type="number"
                 value={quantidadeCamadas}
-                onChange={(e) => setQuantidadeCamadas(Math.max(2, Number(e.target.value)))}
+                onChange={(e: any) => setQuantidadeCamadas(Math.max(2, Number(e.target.value)))}
                 min="2"
                 max="20"
               />
@@ -77,7 +77,7 @@ export default function BandasSpreadConfig({
                 type="checkbox"
                 id="faixa-personalizada"
                 checked={faixaPersonalizada}
-                onChange={(e) => setFaixaPersonalizada(e.target.checked)}
+                onChange={(e: any) => setFaixaPersonalizada(e.target.checked)}
                 className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
               />
               <Label htmlFor="faixa-personalizada" className="text-sm font-medium">
@@ -92,7 +92,7 @@ export default function BandasSpreadConfig({
                   <Input
                     type="number"
                     value={spreadMin}
-                    onChange={(e) => setSpreadMin(Number(e.target.value))}
+                    onChange={(e: any) => setSpreadMin(Number(e.target.value))}
                     step="0.1"
                   />
                 </div>
@@ -102,7 +102,7 @@ export default function BandasSpreadConfig({
                   <Input
                     type="number"
                     value={spreadMax}
-                    onChange={(e) => setSpreadMax(Number(e.target.value))}
+                    onChange={(e: any) => setSpreadMax(Number(e.target.value))}
                     step="0.1"
                   />
                 </div>

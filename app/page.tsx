@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import APP_CONFIG from "@/config/app-config";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import {
-  LineChart, Line, BarChart, Bar,
+  LineChart, Line, BarChart, Bar, Cell,
   XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer,
   ReferenceLine
@@ -181,12 +181,180 @@ const DistributionTooltip = ({ active, payload, label }: any) => {
   );
 };
 
+export type CamadaSpread = {
+  index: number;
+  min: number;
+  max: number;
+  count: number;
+  percent: number;
+  avgPrice1: number;
+  avgPrice2: number;
+  rotulo: string;
+  sugestao: string;
+};
+
+export type ResultadoBandasCamadas = {
+  spreadMin: number;
+  spreadMax: number;
+  step: number;
+  totalNoPeriodo: number;
+  countNaFaixa: number;
+  percentNaFaixa: number;
+  picoCamadaIndex: number;
+  picoSpreadCenter: number;
+  picoCount: number;
+  camadaAtualIndex: number | null;
+  camadaAtualSugestao: string;
+  camadas: CamadaSpread[];
+};
+
+const calculateBandasCamadas = (
+  spreadData: SpreadData[],
+  stock1Data: StockData[],
+  stock2Data: StockData[],
+  bandaPercent: number,
+  numCamadas: number,
+  customFaixa?: { enabled: boolean; min: number; max: number },
+  latestSpreadValue?: number
+): ResultadoBandasCamadas => {
+  if (spreadData.length === 0) {
+    return {
+      spreadMin: 0,
+      spreadMax: 0,
+      step: 0,
+      totalNoPeriodo: 0,
+      countNaFaixa: 0,
+      percentNaFaixa: 0,
+      picoCamadaIndex: 1,
+      picoSpreadCenter: 0,
+      picoCount: 0,
+      camadaAtualIndex: null,
+      camadaAtualSugestao: "Aguardando dados...",
+      camadas: [],
+    };
+  }
+
+  const sorted = [...spreadData].sort((a, b) => a.spread - b.spread);
+  let spreadMin = 0;
+  let spreadMax = 0;
+
+  if (customFaixa && customFaixa.enabled && customFaixa.max > customFaixa.min) {
+    spreadMin = customFaixa.min;
+    spreadMax = customFaixa.max;
+  } else {
+    const tailPct = Math.max(0, (100 - bandaPercent) / 200);
+    const minIdx = Math.floor(sorted.length * tailPct);
+    const maxIdx = Math.min(sorted.length - 1, Math.ceil(sorted.length * (1 - tailPct)));
+    spreadMin = parseFloat(sorted[minIdx].spread.toFixed(2));
+    spreadMax = parseFloat(sorted[maxIdx].spread.toFixed(2));
+  }
+
+  if (spreadMax <= spreadMin) {
+    spreadMax = parseFloat((spreadMin + 1).toFixed(2));
+  }
+
+  const step = parseFloat(((spreadMax - spreadMin) / numCamadas).toFixed(2));
+  const camadas: CamadaSpread[] = [];
+  let countNaFaixa = 0;
+
+  for (let i = 0; i < numCamadas; i++) {
+    const cMin = parseFloat((spreadMin + i * step).toFixed(2));
+    const cMax = parseFloat((i === numCamadas - 1 ? spreadMax : spreadMin + (i + 1) * step).toFixed(2));
+
+    let matchingIndices: number[] = [];
+    for (let idx = 0; idx < spreadData.length; idx++) {
+      const s = spreadData[idx].spread;
+      const inRange = i === numCamadas - 1 ? (s >= cMin && s <= cMax) : (s >= cMin && s < cMax);
+      if (inRange) matchingIndices.push(idx);
+    }
+
+    countNaFaixa += matchingIndices.length;
+    const count = matchingIndices.length;
+    const percent = parseFloat(((count / spreadData.length) * 100).toFixed(1));
+
+    let sum1 = 0;
+    let sum2 = 0;
+    matchingIndices.forEach(idx => {
+      sum1 += stock1Data[idx]?.price || 0;
+      sum2 += stock2Data[idx]?.price || 0;
+    });
+
+    const avgPrice1 = count > 0 ? parseFloat((sum1 / count).toFixed(2)) : 0;
+    const avgPrice2 = count > 0 ? parseFloat((sum2 / count).toFixed(2)) : 0;
+
+    let sugestao = "🟡 Spread Central / Equilíbrio";
+    if (i < numCamadas / 3) {
+      sugestao = "🟢 Spread Baixo — Compra Ação 1";
+    } else if (i >= (numCamadas * 2) / 3) {
+      sugestao = "🔴 Spread Alto — Compra Ação 2";
+    }
+
+    camadas.push({
+      index: i + 1,
+      min: cMin,
+      max: cMax,
+      count,
+      percent,
+      avgPrice1,
+      avgPrice2,
+      rotulo: `R$ ${cMin.toFixed(2)} — R$ ${cMax.toFixed(2)}`,
+      sugestao,
+    });
+  }
+
+  const percentNaFaixa = parseFloat(((countNaFaixa / spreadData.length) * 100).toFixed(1));
+
+  // Achar o Pico (Moda da Curva Gaussiana nas camadas)
+  let picoCamadaIndex = 1;
+  let picoCount = 0;
+  let picoSpreadCenter = (spreadMin + spreadMax) / 2;
+
+  camadas.forEach(c => {
+    if (c.count > picoCount) {
+      picoCount = c.count;
+      picoCamadaIndex = c.index;
+      picoSpreadCenter = parseFloat(((c.min + c.max) / 2).toFixed(2));
+    }
+  });
+
+  // Achar em qual camada o Spread Atual está
+  let camadaAtualIndex: number | null = null;
+  let camadaAtualSugestao = "Spread Fora da Faixa de Frequência";
+  if (latestSpreadValue !== undefined) {
+    const found = camadas.find(c => latestSpreadValue >= c.min && latestSpreadValue <= c.max);
+    if (found) {
+      camadaAtualIndex = found.index;
+      camadaAtualSugestao = found.sugestao;
+    } else if (latestSpreadValue < spreadMin) {
+      camadaAtualSugestao = "🟢 Abaixo da Banda — Forte Oportunidade Ação 1";
+    } else if (latestSpreadValue > spreadMax) {
+      camadaAtualSugestao = "🔴 Acima da Banda — Forte Oportunidade Ação 2";
+    }
+  }
+
+  return {
+    spreadMin,
+    spreadMax,
+    step,
+    totalNoPeriodo: spreadData.length,
+    countNaFaixa,
+    percentNaFaixa,
+    picoCamadaIndex,
+    picoSpreadCenter,
+    picoCount,
+    camadaAtualIndex,
+    camadaAtualSugestao,
+    camadas,
+  };
+};
+
 // ─────────────────────────────────────────
 // TAB DEFINITIONS
 // ─────────────────────────────────────────
-type TabKey = 'resumo' | 'ocorrencias' | 'estatisticas' | 'distribuicao' | 'historicos' | 'configuracoes';
+type TabKey = 'resumo' | 'camadas' | 'ocorrencias' | 'estatisticas' | 'distribuicao' | 'historicos' | 'configuracoes';
 const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
   { key: 'resumo', label: 'Resumo', icon: <Activity className="w-3.5 h-3.5" /> },
+  { key: 'camadas', label: 'Bandas & Camadas', icon: <Layers className="w-3.5 h-3.5" /> },
   { key: 'ocorrencias', label: 'Ocorrências', icon: <Target className="w-3.5 h-3.5" /> },
   { key: 'estatisticas', label: 'Estatísticas', icon: <BarChart2 className="w-3.5 h-3.5" /> },
   { key: 'distribuicao', label: 'Distribuição', icon: <Layers className="w-3.5 h-3.5" /> },
@@ -197,7 +365,7 @@ const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
 // ─────────────────────────────────────────
 // MAIN COMPONENT
 // ─────────────────────────────────────────
-export function StockPairAnalyzer() {
+function StockPairAnalyzer() {
   const LS_KEYS = { occPrefs: 'occurrence_prefs', zRanges: 'zscore_ranges_prefs' } as const;
 
   const [stock1Symbol, setStock1Symbol] = useState("PETR3");
@@ -228,23 +396,23 @@ export function StockPairAnalyzer() {
   const [relevanceBand, setRelevanceBand] = useState<'68' | '95' | '99' | 'all'>('all');
   const [dataSource, setDataSource] = useState<"real" | "simulado">("simulado");
   const [histBins, setHistBins] = useState(20);
+  const [bandaFreqPercent, setBandaFreqPercent] = useState<number>(70);
+  const [numCamadas, setNumCamadas] = useState<number>(5);
+  const [faixaPersonalizada, setFaixaPersonalizada] = useState<boolean>(false);
+  const [customSpreadMin, setCustomSpreadMin] = useState<number>(1.0);
+  const [customSpreadMax, setCustomSpreadMax] = useState<number>(5.0);
+  const [resultadoCamadas, setResultadoCamadas] = useState<ResultadoBandasCamadas | null>(null);
   const cacheRef = useRef<Record<string, { ts: number; data: StockData[] }>>({});
-  const [updateInterval, setUpdateInterval] = useState(APP_CONFIG.TIMING.UPDATE_INTERVALS.REALTIME);
+  const [updateInterval, setUpdateInterval] = useState(APP_CONFIG.TIMING.UPDATE_INTERVALS.HOURLY);
   const [historyDays, setHistoryDays] = useState(APP_CONFIG.TRADING.HISTORICAL_PERIOD.DAYS);
-  const [brapiToken, setBrapiToken] = useState<string>(() => { try { return localStorage.getItem('brapi_token') || ''; } catch { return ''; } });
+  const [brapiToken, setBrapiToken] = useState<string>(APP_CONFIG.API.BRAPI.TOKEN || '');
   const [isLoading, setIsLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [livePrice1, setLivePrice1] = useState<number | null>(null);
   const [livePrice2, setLivePrice2] = useState<number | null>(null);
   const [liveChange1, setLiveChange1] = useState<number | null>(null);
   const [liveChange2, setLiveChange2] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<TabKey>(() => {
-    try {
-      const saved = typeof window !== 'undefined' ? localStorage.getItem('ui_active_tab') : null;
-      if (saved && TABS.map(t => t.key).includes(saved as TabKey)) return saved as TabKey;
-    } catch { }
-    return 'resumo';
-  });
+  const [activeTab, setActiveTab] = useState<TabKey>('resumo');
 
   useEffect(() => { try { localStorage.setItem('ui_active_tab', activeTab); } catch { } }, [activeTab]);
 
@@ -254,6 +422,10 @@ export function StockPairAnalyzer() {
       if (occ) { const p = JSON.parse(occ); if (p.limit) setOccLimit(p.limit); if (p.sort) setOccSort(p.sort); if (p.columns) setShowCols(p.columns); }
       const zr = localStorage.getItem(LS_KEYS.zRanges);
       if (zr) { const p = JSON.parse(zr); if (Array.isArray(p.ranges)) setZRanges(p.ranges); if (typeof p.filter === 'boolean') setFilterByRanges(p.filter); if (typeof p.text === 'string') setZRangeText(p.text); }
+      const savedToken = localStorage.getItem('brapi_token');
+      if (savedToken) setBrapiToken(savedToken);
+      const savedTab = localStorage.getItem('ui_active_tab');
+      if (savedTab && TABS.map(t => t.key).includes(savedTab as TabKey)) setActiveTab(savedTab as TabKey);
     } catch { }
   }, []);
 
@@ -269,29 +441,23 @@ export function StockPairAnalyzer() {
     // Sem token:  PETR4, VALE3, MGLU3, ITUB4 têm acesso irrestrito gratuito
     const fetchBrapi = async (symbol: string): Promise<StockData[] | null> => {
       try {
-        const cacheKey = `brapi:${symbol}:${historyDays}`;
+        const cacheKey = `brapi:${symbol}:${historyDays}:${brapiToken}`;
         const now = Date.now();
         const cacheTTL = 30 * 60 * 1000; // 30 min cache (free plan refresh)
         const cached = cacheRef.current[cacheKey];
         if (cached && now - cached.ts < cacheTTL) return cached.data;
 
-        // Mapear período histórico para range da brapi
+        // Mapear período histórico para range da brapi (limite de 3mo da API)
         const getRange = (days: number) => {
-          if (days <= 30) return '1mo';
-          if (days <= 60) return '3mo';
-          if (days <= 90) return '3mo';
-          if (days <= 150) return '6mo';
-          return '1y';
+          if (days <= 22) return '1mo';
+          return '3mo';
         };
-
-        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-        if (brapiToken) headers['Authorization'] = `Bearer ${brapiToken}`;
 
         const url = `https://brapi.dev/api/quote/${symbol}?range=${getRange(historyDays)}&interval=1d&fundamental=false${
           brapiToken ? `&token=${brapiToken}` : ''
         }`;
 
-        const res = await fetch(url, { headers, next: { revalidate: 0 } } as RequestInit);
+        const res = await fetch(url, { cache: 'no-store' });
         if (!res.ok) return null;
         const json = await res.json();
         const result = json?.results?.[0];
@@ -306,16 +472,14 @@ export function StockPairAnalyzer() {
           .filter((d: StockData) => d.price > 0);
 
         cacheRef.current[cacheKey] = { ts: now, data };
-        return data.length > 5 ? data : null;
+        return data.length > 0 ? data : null;
       } catch { return null; }
     };
 
     const fetchLiveQuote = async (symbol: string) => {
       try {
-        const headers: Record<string, string> = {};
-        if (brapiToken) headers['Authorization'] = `Bearer ${brapiToken}`;
         const url = `https://brapi.dev/api/quote/${symbol}?fundamental=false${brapiToken ? `&token=${brapiToken}` : ''}`;
-        const res = await fetch(url, { headers } as RequestInit);
+        const res = await fetch(url, { cache: 'no-store' });
         if (!res.ok) return null;
         const json = await res.json();
         return json?.results?.[0] ?? null;
@@ -379,6 +543,21 @@ export function StockPairAnalyzer() {
     return () => clearInterval(interval);
   }, [stock1Symbol, stock2Symbol, updateInterval, histBins, historyDays, brapiToken]);
 
+  useEffect(() => {
+    if (spreadData.length > 0 && stock1Data.length > 0 && stock2Data.length > 0) {
+      const res = calculateBandasCamadas(
+        spreadData,
+        stock1Data,
+        stock2Data,
+        bandaFreqPercent,
+        numCamadas,
+        { enabled: faixaPersonalizada, min: customSpreadMin, max: customSpreadMax },
+        latestSpread
+      );
+      setResultadoCamadas(res);
+    }
+  }, [spreadData, stock1Data, stock2Data, bandaFreqPercent, numCamadas, faixaPersonalizada, customSpreadMin, customSpreadMax, latestSpread]);
+
   const getStockName = (symbol: string) => BRAZILIAN_STOCKS.find(s => s.symbol === symbol)?.name ?? symbol;
   const getLatestPrice = (data: StockData[]) => data.length > 0 ? data[data.length - 1].price : 0;
 
@@ -388,6 +567,319 @@ export function StockPairAnalyzer() {
     NEUTRAL: { label: "NEUTRO", cls: "signal-neutral", bg: "hsla(215,20%,55%,0.08)", border: "hsla(215,20%,55%,0.2)", Icon: Activity },
   };
   const sc = signalConfig[signal];
+
+  const renderBandasCamadasPanel = () => {
+    if (!resultadoCamadas) return <div className="text-slate-400 p-6 text-center">Calculando camadas...</div>;
+
+    return (
+      <div className="space-y-6 animate-fade-in">
+        {/* Painel de Controle: Banda de Frequência & Número de Camadas */}
+        <div className="glass rounded-2xl p-6 border border-emerald-500/30 bg-gradient-to-br from-emerald-500/5 to-transparent">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+            <div>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-bold uppercase tracking-wider mb-2">
+                <Target className="w-3.5 h-3.5" /> Frequência & Camadas de Spread
+              </span>
+              <h2 className="text-xl font-black text-white">
+                Distribuição Gaussiana — {stock1Symbol} vs {stock2Symbol}
+              </h2>
+              <p className="text-xs text-slate-400">
+                Selecione a banda de probabilidade e divida o intervalo em camadas de spread iguais
+              </p>
+            </div>
+
+            {/* Toggle de Faixa Personalizada */}
+            <label className="flex items-center gap-2 cursor-pointer bg-white/5 px-3 py-2 rounded-xl border border-white/10 hover:border-emerald-500/40 transition-colors">
+              <input
+                type="checkbox"
+                checked={faixaPersonalizada}
+                onChange={e => setFaixaPersonalizada(e.target.checked)}
+                className="rounded border-slate-700 bg-slate-900 text-emerald-500 focus:ring-emerald-500"
+              />
+              <span className="text-xs font-semibold text-slate-300">Definir Faixa Manualmente</span>
+            </label>
+          </div>
+
+          {/* Seletores Rápidos */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Banda de Frequência */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
+                Banda de Frequência Gaussiana ({bandaFreqPercent}%)
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {[60, 68, 70, 80, 90, 95].map(pct => (
+                  <button
+                    key={pct}
+                    disabled={faixaPersonalizada}
+                    onClick={() => setBandaFreqPercent(pct)}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                      bandaFreqPercent === pct && !faixaPersonalizada
+                        ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/30 scale-105'
+                        : 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white'
+                    }`}
+                  >
+                    {pct}%
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Quantidade de Camadas */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
+                Divisão em Camadas ({numCamadas} camadas de R$ {resultadoCamadas.step.toFixed(2)})
+              </label>
+              <div className="flex flex-wrap items-center gap-2">
+                {[3, 5, 7, 10, 12].map(n => (
+                  <button
+                    key={n}
+                    onClick={() => setNumCamadas(n)}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                      numCamadas === n
+                        ? 'bg-cyan-500 text-slate-950 shadow-lg shadow-cyan-500/30 scale-105'
+                        : 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white'
+                    }`}
+                  >
+                    {n} Camadas
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Se Faixa Personalizada estiver habilitada */}
+          {faixaPersonalizada && (
+            <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-white/10">
+              <div>
+                <label className="text-xs font-medium text-slate-400 block mb-1">Spread Mínimo (R$)</label>
+                <input
+                  type="number"
+                  step="0.10"
+                  value={customSpreadMin}
+                  onChange={e => setCustomSpreadMin(parseFloat(e.target.value) || 0)}
+                  className="w-full bg-slate-900/80 border border-white/20 rounded-xl px-3 py-1.5 text-sm font-mono text-emerald-400 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-400 block mb-1">Spread Máximo (R$)</label>
+                <input
+                  type="number"
+                  step="0.10"
+                  value={customSpreadMax}
+                  onChange={e => setCustomSpreadMax(parseFloat(e.target.value) || 0)}
+                  className="w-full bg-slate-900/80 border border-white/20 rounded-xl px-3 py-1.5 text-sm font-mono text-emerald-400 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Cards de Métricas em Destaque no Estilo da Imagem do Caderno */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+            <div className="glass-strong rounded-xl p-4 border border-emerald-500/30 text-center">
+              <span className="text-xs text-slate-400 font-medium block">Spread Mínimo ({faixaPersonalizada ? 'Manual' : `${bandaFreqPercent}%`})</span>
+              <span className="text-2xl font-black font-mono text-emerald-400 mt-1 block">
+                R$ {resultadoCamadas.spreadMin.toFixed(2)}
+              </span>
+            </div>
+            <div className="glass-strong rounded-xl p-4 border border-emerald-500/30 text-center">
+              <span className="text-xs text-slate-400 font-medium block">Spread Máximo ({faixaPersonalizada ? 'Manual' : `${bandaFreqPercent}%`})</span>
+              <span className="text-2xl font-black font-mono text-emerald-400 mt-1 block">
+                R$ {resultadoCamadas.spreadMax.toFixed(2)}
+              </span>
+            </div>
+            <div className="glass-strong rounded-xl p-4 border border-cyan-500/30 text-center">
+              <span className="text-xs text-slate-400 font-medium block">Passo por Camada</span>
+              <span className="text-2xl font-black font-mono text-cyan-400 mt-1 block">
+                R$ {resultadoCamadas.step.toFixed(2)}
+              </span>
+            </div>
+            <div className="glass-strong rounded-xl p-4 border border-violet-500/30 text-center">
+              <span className="text-xs text-slate-400 font-medium block">Ocorrências na Banda</span>
+              <span className="text-2xl font-black font-mono text-violet-400 mt-1 block">
+                {resultadoCamadas.countNaFaixa} <span className="text-sm text-slate-400">({resultadoCamadas.percentNaFaixa}%)</span>
+              </span>
+            </div>
+          </div>
+
+          {/* Painel Operacional - Giro por Camadas (Molde do Estudo de Caso) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+            <div className="glass-strong rounded-xl p-5 border border-amber-500/40 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">🏆 Pico de Frequência (Moda Gaussiana)</span>
+                <span className="text-xs text-amber-200 font-mono font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/30">
+                  Camada #{resultadoCamadas.picoCamadaIndex}
+                </span>
+              </div>
+              <div className="mt-3 flex items-baseline justify-between">
+                <span className="text-3xl font-black font-mono text-white">R$ {resultadoCamadas.picoSpreadCenter.toFixed(2)}</span>
+                <span className="text-sm font-bold text-amber-300">{resultadoCamadas.picoCount} ocorrências no pico</span>
+              </div>
+              <p className="text-xs text-slate-400 mt-2">
+                Pico onde a diferença de preços ocorreu com maior frequência na história.
+              </p>
+            </div>
+
+            <div className="glass-strong rounded-xl p-5 border border-cyan-500/40 bg-gradient-to-r from-cyan-500/10 via-cyan-500/5 to-transparent">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider">🎯 Spread Atual & Giro da Operação</span>
+                {resultadoCamadas.camadaAtualIndex && (
+                  <span className="text-xs text-cyan-200 font-mono font-bold px-2.5 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-500/30">
+                    Camada #{resultadoCamadas.camadaAtualIndex}
+                  </span>
+                )}
+              </div>
+              <div className="mt-3 flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
+                <span className="text-3xl font-black font-mono text-white">R$ {latestSpread.toFixed(2)}</span>
+                <span className="text-xs sm:text-sm font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
+                  {resultadoCamadas.camadaAtualSugestao}
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 mt-2">
+                Tomada de decisão operacional instantânea na camada onde o spread se encontra agora.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Gráfico da Curva Gaussiana — Idêntico à Frequência do Caderno */}
+        <div className="glass rounded-2xl p-6 border border-white/10">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-base font-bold text-white">Frequência dos Spreads & Curva Gaussiana</h3>
+              <p className="text-xs text-slate-400">
+                Região verde central mostra os {bandaFreqPercent}% mais frequentes ({resultadoCamadas.spreadMin.toFixed(2)} a {resultadoCamadas.spreadMax.toFixed(2)})
+              </p>
+            </div>
+            <div className="flex items-center gap-4 text-xs">
+              <span className="flex items-center gap-1.5 text-emerald-400 font-semibold">
+                <span className="w-3 h-3 rounded bg-emerald-500 inline-block" /> Dentro de {bandaFreqPercent}%
+              </span>
+              <span className="flex items-center gap-1.5 text-amber-400 font-semibold">
+                <span className="w-3 h-3 rounded bg-amber-500 inline-block" /> Caudas Externas
+              </span>
+            </div>
+          </div>
+
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={histogramData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsla(210,40%,96%,0.04)" />
+                <XAxis dataKey="bin" tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={v => `R$${v}`} />
+                <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                <Tooltip content={<DistributionTooltip />} />
+                <ReferenceLine
+                  x={resultadoCamadas.spreadMin}
+                  stroke="#10b981"
+                  strokeWidth={2}
+                  strokeDasharray="4 4"
+                  label={{ value: `Mínimo (${bandaFreqPercent}%): R$ ${resultadoCamadas.spreadMin.toFixed(2)}`, position: 'top', fill: '#10b981', fontSize: 11, fontWeight: 'bold' }}
+                />
+                <ReferenceLine
+                  x={resultadoCamadas.spreadMax}
+                  stroke="#10b981"
+                  strokeWidth={2}
+                  strokeDasharray="4 4"
+                  label={{ value: `Máximo (${bandaFreqPercent}%): R$ ${resultadoCamadas.spreadMax.toFixed(2)}`, position: 'top', fill: '#10b981', fontSize: 11, fontWeight: 'bold' }}
+                />
+                <Bar dataKey="frequency" name="Frequência" radius={[4, 4, 0, 0]}>
+                  {histogramData.map((entry, index) => {
+                    const inBand = entry.bin >= resultadoCamadas.spreadMin && entry.bin <= resultadoCamadas.spreadMax;
+                    return <Cell key={`cell-${index}`} fill={inBand ? '#10b981' : '#f59e0b'} opacity={inBand ? 0.9 : 0.6} />;
+                  })}
+                </Bar>
+                <Line type="monotone" dataKey="normal" name="Curva Gaussiana" stroke="#06b6d4" strokeWidth={2.5} dot={false} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Tabela de Camadas de Spread x Frequência & Preço Médio das Ações */}
+        <div className="glass rounded-2xl p-6 border border-white/10">
+          <h3 className="text-base font-bold text-white mb-1">
+            Tabela de Camadas ({numCamadas} sub-faixas de R$ {resultadoCamadas.step.toFixed(2)})
+          </h3>
+          <p className="text-xs text-slate-400 mb-4">
+            Frequência de ocorrência e Preços Médios de {stock1Symbol} e {stock2Symbol} em cada camada
+          </p>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-white/10 text-xs font-bold text-slate-400 uppercase">
+                  <th className="py-3 px-3">Camada</th>
+                  <th className="py-3 px-3">Faixa de Spread</th>
+                  <th className="py-3 px-3">Frequência</th>
+                  <th className="py-3 px-3">Preço Méd. {stock1Symbol}</th>
+                  <th className="py-3 px-3">Preço Méd. {stock2Symbol}</th>
+                  <th className="py-3 px-3">Sugestão / Leitura</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5 text-sm">
+                {resultadoCamadas.camadas.map(camada => {
+                  const isAtual = camada.index === resultadoCamadas.camadaAtualIndex;
+                  const isPico = camada.index === resultadoCamadas.picoCamadaIndex;
+
+                  return (
+                    <tr
+                      key={camada.index}
+                      className={`transition-colors font-mono ${
+                        isAtual
+                          ? 'bg-cyan-500/15 border-l-4 border-cyan-400'
+                          : isPico
+                          ? 'bg-amber-500/10'
+                          : 'hover:bg-white/5'
+                      }`}
+                    >
+                      <td className="py-3 px-3 font-bold text-slate-300">
+                        <div className="flex items-center gap-2">
+                          <span>#{camada.index}</span>
+                          {isAtual && (
+                            <span className="text-[10px] bg-cyan-500 text-slate-950 font-black px-1.5 py-0.5 rounded uppercase">
+                              ATUAL
+                            </span>
+                          )}
+                          {isPico && !isAtual && (
+                            <span className="text-[10px] bg-amber-500 text-slate-950 font-black px-1.5 py-0.5 rounded uppercase">
+                              PICO
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-3 px-3 font-bold text-cyan-400">{camada.rotulo}</td>
+                      <td className="py-3 px-3">
+                        <div className="flex items-center gap-3">
+                          <span className="font-bold text-white w-16">{camada.count} vezes</span>
+                          <div className="w-24 bg-white/10 rounded-full h-2 overflow-hidden hidden sm:block">
+                            <div
+                              className="bg-emerald-400 h-full rounded-full"
+                              style={{ width: `${Math.min(100, camada.percent * 2)}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-slate-400">({camada.percent}%)</span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-3 text-emerald-400 font-bold">R$ {camada.avgPrice1.toFixed(2)}</td>
+                      <td className="py-3 px-3 text-violet-400 font-bold">R$ {camada.avgPrice2.toFixed(2)}</td>
+                      <td className="py-3 px-3 text-xs font-sans">
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full border ${
+                          isAtual
+                            ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200 font-bold'
+                            : 'bg-white/5 border-white/10 text-slate-300'
+                        }`}>
+                          {camada.sugestao}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   // ─── RENDER ───
   return (
@@ -645,8 +1137,16 @@ export function StockPairAnalyzer() {
               </ResponsiveContainer>
             </div>
           </div>
+
+          {/* Destaque Principal: Painel Completo de Frequência & Camadas */}
+          {renderBandasCamadasPanel()}
         </div>
       )}
+
+      {/* ════════════════════════════════════
+          TAB: BANDAS & CAMADAS ('camadas')
+      ════════════════════════════════════ */}
+      {activeTab === 'camadas' && renderBandasCamadasPanel()}
 
       {/* ════════════════════════════════════
           TAB: ESTATÍSTICAS
