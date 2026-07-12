@@ -365,9 +365,9 @@ const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
 // ─────────────────────────────────────────
 // MAIN COMPONENT
 // ─────────────────────────────────────────
-function StockPairAnalyzer() {
-  const LS_KEYS = { occPrefs: 'occurrence_prefs', zRanges: 'zscore_ranges_prefs' } as const;
+const LS_KEYS = { occPrefs: 'occurrence_prefs', zRanges: 'zscore_ranges_prefs' } as const;
 
+function StockPairAnalyzer() {
   const [stock1Symbol, setStock1Symbol] = useState("PETR3");
   const [stock2Symbol, setStock2Symbol] = useState("PETR4");
   const [stock1Data, setStock1Data] = useState<StockData[]>([]);
@@ -541,7 +541,7 @@ function StockPairAnalyzer() {
     fetchData();
     const interval = setInterval(fetchData, updateInterval);
     return () => clearInterval(interval);
-  }, [stock1Symbol, stock2Symbol, updateInterval, histBins, historyDays, brapiToken]);
+  }, [stock1Symbol, stock2Symbol, updateInterval, histBins, historyDays, brapiToken, zRanges]);
 
   useEffect(() => {
     if (spreadData.length > 0 && stock1Data.length > 0 && stock2Data.length > 0) {

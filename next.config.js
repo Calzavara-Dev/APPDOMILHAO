@@ -7,8 +7,6 @@ const nextConfig = {
   images: {
     domains: ['assets.mixkit.co'],
   },
-  // Permitir origens no ambiente de desenvolvimento (Next 15+)
-  allowedDevOrigins: ['http://192.168.0.5:3000'],
   // Configurações PWA / headers de segurança
   async headers() {
     return [
