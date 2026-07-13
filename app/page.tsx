@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import APP_CONFIG from "@/config/app-config";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import {
   LineChart, Line, BarChart, Bar, Cell,
   XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer,
-  ReferenceLine
+  ReferenceLine, ComposedChart, Area
 } from "recharts";
 import {
   Select,
@@ -22,9 +22,18 @@ import {
   Settings, TrendingUp, TrendingDown, Activity,
   BarChart2, Clock, Layers, Eye, EyeOff,
   ChevronRight, Zap, Target, Radio,
-  Share2, Copy, Check, FileText, Compass, Award, ShieldAlert, ShieldCheck
+  Share2, Check, Compass, Award,
+  Bell, BellOff, Sun, Moon, Calculator, FlaskConical,
+  ListChecks, BookOpen, Search, Trash2, History
 } from "lucide-react";
-import { calculatePairStats, generateOperationalReport, type PairStats } from "@/lib/quantMetrics";
+import {
+  calculatePairStats, generateOperationalReport, type PairStats,
+  calculateStopLossTakeProfit, runBacktest, type StopLossResult, type BacktestResult
+} from "@/lib/quantMetrics";
+import { saveSignal, loadSignals, clearSignals, type SignalRecord } from "@/lib/signalHistory";
+import {
+  getNotifPermission, requestPermission, checkAndNotify, type NotifPermission
+} from "@/lib/pushNotification";
 
 // ─────────────────────────────────────────
 // TYPES
@@ -367,10 +376,14 @@ const calculateBandasCamadas = (
 // ─────────────────────────────────────────
 // TAB DEFINITIONS
 // ─────────────────────────────────────────
-type TabKey = 'resumo' | 'camadas' | 'ocorrencias' | 'estatisticas' | 'configuracoes';
+type TabKey = 'resumo' | 'camadas' | 'ocorrencias' | 'estatisticas' | 'ferramentas' | 'backtest' | 'watchlist' | 'historico' | 'configuracoes';
 const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
   { key: 'resumo', label: 'Resumo', icon: <Activity className="w-3.5 h-3.5" /> },
   { key: 'camadas', label: 'Bandas & Camadas', icon: <Layers className="w-3.5 h-3.5" /> },
+  { key: 'backtest', label: 'Backtest', icon: <FlaskConical className="w-3.5 h-3.5" /> },
+  { key: 'ferramentas', label: 'Calculadora', icon: <Calculator className="w-3.5 h-3.5" /> },
+  { key: 'watchlist', label: 'Watchlist', icon: <Search className="w-3.5 h-3.5" /> },
+  { key: 'historico', label: 'Histórico', icon: <History className="w-3.5 h-3.5" /> },
   { key: 'ocorrencias', label: 'Ocorrências', icon: <Target className="w-3.5 h-3.5" /> },
   { key: 'estatisticas', label: 'Estatísticas', icon: <BarChart2 className="w-3.5 h-3.5" /> },
   { key: 'configuracoes', label: 'Config', icon: <Settings className="w-3.5 h-3.5" /> },
@@ -429,6 +442,35 @@ function StockPairAnalyzer() {
   const [activeTab, setActiveTab] = useState<TabKey>('resumo');
   const [copiedReport, setCopiedReport] = useState<boolean>(false);
 
+  // ── Dark / Light Mode ──
+  const [isDark, setIsDark] = useState<boolean>(true);
+
+  // ── Push Notifications ──
+  const [notifPermission, setNotifPermission] = useState<NotifPermission>('default');
+
+  // ── Histórico de Sinais ──
+  const [signalHistory, setSignalHistory] = useState<SignalRecord[]>([]);
+
+  // ── Calculadora de Sizing / Stop Loss ──
+  const [capitalReais, setCapitalReais] = useState<number>(10000);
+  const [stopLossResult, setStopLossResult] = useState<StopLossResult | null>(null);
+
+  // ── Backtest ──
+  const [backtestZEntry, setBacktestZEntry] = useState<number>(1.5);
+  const [backtestZExit, setBacktestZExit] = useState<number>(0.3);
+  const [backtestResult, setBacktestResult] = useState<BacktestResult | null>(null);
+
+  // ── Watchlist ──
+  const WATCHLIST_PAIRS: [string, string][] = [
+    ['PETR3', 'PETR4'],
+    ['VALE3', 'PETR4'],
+    ['ITUB4', 'BBDC4'],
+    ['ABEV3', 'BRFS3'],
+    ['WEGE3', 'EGIE3'],
+    ['MGLU3', 'VIIA3'],
+  ];
+
+
   const pairStats: PairStats = useMemo(() => {
     return calculatePairStats(stock1Data, stock2Data, spreadData);
   }, [stock1Data, stock2Data, spreadData]);
@@ -449,10 +491,73 @@ function StockPairAnalyzer() {
     setTimeout(() => setCopiedReport(false), 3000);
   };
 
+  // ── Dark / Light Mode ──
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    try { localStorage.setItem('spreadtrader_theme', isDark ? 'dark' : 'light'); } catch { }
+  }, [isDark]);
+
+  // ── Notificações: carregar permissão ao montar ──
+  useEffect(() => {
+    setNotifPermission(getNotifPermission());
+  }, []);
+
+  // ── Histórico de sinais: carregar ao montar ──
+  useEffect(() => {
+    setSignalHistory(loadSignals());
+  }, []);
+
+  // ── Auto-salvar sinal quando signal muda (não NEUTRAL) ──
+  useEffect(() => {
+    if (signal !== 'NEUTRAL' && latestSpread !== 0) {
+      saveSignal({
+        pair: `${stock1Symbol}/${stock2Symbol}`,
+        signal,
+        spread: latestSpread,
+        zScore: latestZScore,
+        camadaSugestao: resultadoCamadas?.camadaAtualSugestao,
+      });
+      setSignalHistory(loadSignals());
+      // Verifica notificação
+      checkAndNotify(`${stock1Symbol}/${stock2Symbol}`, latestZScore, 1.5);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [signal, stock1Symbol, stock2Symbol]);
+
+  // ── Calculadora Stop Loss / Sizing ──
+  const handleCalculateSizing = useCallback(() => {
+    const p1 = livePrice1 ?? (stock1Data.length ? stock1Data[stock1Data.length - 1].price : 0);
+    const p2 = livePrice2 ?? (stock2Data.length ? stock2Data[stock2Data.length - 1].price : 0);
+    const result = calculateStopLossTakeProfit(
+      latestSpread, latestZScore, pairStats, p1, p2, capitalReais
+    );
+    setStopLossResult(result);
+  }, [latestSpread, latestZScore, pairStats, livePrice1, livePrice2, stock1Data, stock2Data, capitalReais]);
+
+  // ── Recalcular automaticamente quando dados mudam ──
+  useEffect(() => {
+    if (spreadData.length > 0) {
+      handleCalculateSizing();
+    }
+  }, [spreadData, handleCalculateSizing]);
+
+  // ── Backtest ──
+  const handleRunBacktest = useCallback(() => {
+    if (spreadData.length < 5) return;
+    const result = runBacktest(spreadData, backtestZEntry, backtestZExit);
+    setBacktestResult(result);
+  }, [spreadData, backtestZEntry, backtestZExit]);
+
+  useEffect(() => {
+    if (spreadData.length > 0) handleRunBacktest();
+  }, [spreadData, handleRunBacktest]);
+
   useEffect(() => { try { localStorage.setItem('ui_active_tab', activeTab); } catch { } }, [activeTab]);
 
   useEffect(() => {
     try {
+      const savedTheme = localStorage.getItem('spreadtrader_theme');
+      if (savedTheme) setIsDark(savedTheme === 'dark');
       const occ = localStorage.getItem(LS_KEYS.occPrefs);
       if (occ) { const p = JSON.parse(occ); if (p.limit) setOccLimit(p.limit); if (p.sort) setOccSort(p.sort); if (p.columns) setShowCols(p.columns); }
       const zr = localStorage.getItem(LS_KEYS.zRanges);
@@ -463,6 +568,8 @@ function StockPairAnalyzer() {
       if (savedTab && TABS.map(t => t.key).includes(savedTab as TabKey)) setActiveTab(savedTab as TabKey);
     } catch { }
   }, []);
+
+
 
   useEffect(() => { try { localStorage.setItem(LS_KEYS.occPrefs, JSON.stringify({ limit: occLimit, sort: occSort, columns: showCols })); } catch { } }, [occLimit, occSort, showCols]);
   useEffect(() => { try { localStorage.setItem(LS_KEYS.zRanges, JSON.stringify({ ranges: zRanges, filter: filterByRanges, text: zRangeText })); } catch { } }, [zRanges, filterByRanges, zRangeText]);
@@ -1057,6 +1164,36 @@ function StockPairAnalyzer() {
                 aria-label="Configurações"
               >
                 <Settings className="w-4 h-4" />
+              </button>
+
+              {/* Dark / Light Mode Toggle */}
+              <button
+                onClick={() => setIsDark(d => !d)}
+                className="w-9 h-9 rounded-xl glass hover:border-white/20 transition-all flex items-center justify-center text-slate-400 hover:text-amber-400"
+                aria-label={isDark ? 'Ativar modo claro' : 'Ativar modo escuro'}
+                title={isDark ? 'Modo Claro' : 'Modo Escuro'}
+              >
+                {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              </button>
+
+              {/* Notificações */}
+              <button
+                onClick={async () => {
+                  const perm = await requestPermission();
+                  setNotifPermission(perm);
+                }}
+                className={`w-9 h-9 rounded-xl glass transition-all flex items-center justify-center ${
+                  notifPermission === 'granted'
+                    ? 'text-emerald-400 border-emerald-500/30'
+                    : notifPermission === 'denied'
+                    ? 'text-red-400 border-red-500/20 opacity-50 cursor-not-allowed'
+                    : 'text-slate-400 hover:text-cyan-400 hover:border-white/20'
+                }`}
+                aria-label="Alertas"
+                title={notifPermission === 'granted' ? 'Alertas ativos' : notifPermission === 'denied' ? 'Alertas bloqueados' : 'Ativar alertas'}
+                disabled={notifPermission === 'denied'}
+              >
+                {notifPermission === 'granted' ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
               </button>
             </div>
           </div>
@@ -1676,6 +1813,382 @@ function StockPairAnalyzer() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════
+          TAB: BACKTEST (D — Gráfico Z-Score com bandas + C — P&L simulado)
+      ════════════════════════════════════ */}
+      {activeTab === 'backtest' && (
+        <div className="space-y-6 animate-fade-in">
+          {/* Config do Backtest */}
+          <div className="glass rounded-2xl p-5 border border-white/10 flex flex-wrap gap-4 items-end">
+            <div>
+              <label className="text-xs text-slate-400 block mb-1.5">Entrada (Z-Score ±)</label>
+              <input
+                type="number" step="0.1" min="0.5" max="3"
+                value={backtestZEntry}
+                onChange={e => setBacktestZEntry(Number(e.target.value))}
+                className="input-dark w-24 text-center font-mono"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-slate-400 block mb-1.5">Saída (Z-Score ±)</label>
+              <input
+                type="number" step="0.1" min="0" max="1.5"
+                value={backtestZExit}
+                onChange={e => setBacktestZExit(Number(e.target.value))}
+                className="input-dark w-24 text-center font-mono"
+              />
+            </div>
+            <button
+              onClick={handleRunBacktest}
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-violet-500 text-slate-950 text-sm font-bold hover:opacity-90 transition-all shadow-lg shadow-cyan-500/20 flex items-center gap-2"
+            >
+              <FlaskConical className="w-4 h-4" />
+              Rodar Backtest
+            </button>
+          </div>
+
+          {/* KPIs do Backtest */}
+          {backtestResult && (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[
+                  { label: 'Total Operações', value: backtestResult.totalTrades, color: 'text-white' },
+                  { label: 'Win Rate', value: `${backtestResult.winRate}%`, color: backtestResult.winRate >= 50 ? 'text-emerald-400' : 'text-red-400' },
+                  { label: 'P&L Total (Spread %)', value: `${backtestResult.totalPnlPct >= 0 ? '+' : ''}${backtestResult.totalPnlPct}%`, color: backtestResult.totalPnlPct >= 0 ? 'text-emerald-400' : 'text-red-400' },
+                  { label: 'Max Drawdown', value: `-${backtestResult.maxDrawdown}%`, color: 'text-amber-400' },
+                  { label: 'P&L Médio por Trade', value: `${backtestResult.avgPnlPct >= 0 ? '+' : ''}${backtestResult.avgPnlPct}%`, color: backtestResult.avgPnlPct >= 0 ? 'text-emerald-400' : 'text-red-400' },
+                  { label: 'Duração Média', value: `${backtestResult.avgDuration} per.`, color: 'text-cyan-400' },
+                ].map((kpi, i) => (
+                  <div key={i} className="kpi-card animate-fade-in-up">
+                    <span className="text-xs text-slate-400 uppercase tracking-wider block mb-2">{kpi.label}</span>
+                    <div className={`text-2xl font-black font-mono ${kpi.color}`}>{kpi.value}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Gráfico de Z-Score com Bandas ±1σ / ±2σ */}
+              <div className="glass rounded-2xl p-5 border border-white/10">
+                <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-cyan-400" />
+                  Z-Score Histórico com Bandas de Desvio ±1σ / ±2σ
+                </h3>
+                <ResponsiveContainer width="100%" height={280}>
+                  <ComposedChart data={spreadData.map(d => ({ date: d.date.slice(5), z: d.zScore }))}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                    <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#64748b' }} />
+                    <YAxis tick={{ fontSize: 10, fill: '#64748b' }} domain={[-3.5, 3.5]} />
+                    <Tooltip contentStyle={{ background: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', fontSize: '12px' }} formatter={(v: any) => [`${Number(v).toFixed(2)} σ`, 'Z-Score']} />
+                    <ReferenceLine y={2} stroke="#ef4444" strokeDasharray="6 3" strokeWidth={1.5} label={{ value: '+2σ', fill: '#ef4444', fontSize: 10 }} />
+                    <ReferenceLine y={1} stroke="#f97316" strokeDasharray="4 2" strokeWidth={1} label={{ value: '+1σ', fill: '#f97316', fontSize: 10 }} />
+                    <ReferenceLine y={0} stroke="rgba(255,255,255,0.2)" strokeWidth={1} />
+                    <ReferenceLine y={-1} stroke="#22d3ee" strokeDasharray="4 2" strokeWidth={1} label={{ value: '-1σ', fill: '#22d3ee', fontSize: 10 }} />
+                    <ReferenceLine y={-2} stroke="#10b981" strokeDasharray="6 3" strokeWidth={1.5} label={{ value: '-2σ', fill: '#10b981', fontSize: 10 }} />
+                    <Line type="monotone" dataKey="z" stroke="#8b5cf6" strokeWidth={2} dot={false} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Tabela de Trades */}
+              {backtestResult.trades.length > 0 && (
+                <div className="glass rounded-2xl border border-white/10 overflow-hidden">
+                  <div className="px-5 py-4 border-b border-white/10">
+                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                      <ListChecks className="w-4 h-4 text-violet-400" />
+                      Operações Simuladas ({backtestResult.totalTrades})
+                    </h3>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-xs">
+                      <thead className="bg-white/5 text-slate-400 uppercase tracking-wider text-[11px]">
+                        <tr>
+                          <th className="py-2 px-4 text-left">Entrada</th>
+                          <th className="py-2 px-4 text-left">Saída</th>
+                          <th className="py-2 px-4">Direção</th>
+                          <th className="py-2 px-4">Spread Ent.</th>
+                          <th className="py-2 px-4">Spread Saída</th>
+                          <th className="py-2 px-4">Z Ent.</th>
+                          <th className="py-2 px-4">Dur.</th>
+                          <th className="py-2 px-4">P&L %</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5 font-mono">
+                        {backtestResult.trades.map((t, i) => (
+                          <tr key={i} className={`hover:bg-white/5 transition-colors ${t.pnlPct >= 0 ? 'border-l-2 border-emerald-500/30' : 'border-l-2 border-red-500/30'}`}>
+                            <td className="py-2.5 px-4 text-slate-300">{t.entryDate}</td>
+                            <td className="py-2.5 px-4 text-slate-300">{t.exitDate}</td>
+                            <td className="py-2.5 px-4 text-center">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${t.direction === 'LONG' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-300'}`}>
+                                {t.direction}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-4 text-center text-slate-300">R${t.entrySpread.toFixed(2)}</td>
+                            <td className="py-2.5 px-4 text-center text-slate-300">R${t.exitSpread.toFixed(2)}</td>
+                            <td className="py-2.5 px-4 text-center text-slate-400">{t.entryZ >= 0 ? '+' : ''}{t.entryZ}</td>
+                            <td className="py-2.5 px-4 text-center text-slate-400">{t.durationDays}d</td>
+                            <td className={`py-2.5 px-4 text-center font-bold ${t.pnlPct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                              {t.pnlPct >= 0 ? '+' : ''}{t.pnlPct}%
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ════════════════════════════════════
+          TAB: FERRAMENTAS — Calculadora de Sizing & Stop Loss (A + B)
+      ════════════════════════════════════ */}
+      {activeTab === 'ferramentas' && (
+        <div className="space-y-6 animate-fade-in">
+          <div className="glass rounded-2xl p-6 border border-cyan-500/30 bg-gradient-to-br from-cyan-500/5 via-transparent to-violet-500/5">
+            <h2 className="text-base font-bold text-white mb-1 flex items-center gap-2">
+              <Calculator className="w-5 h-5 text-cyan-400" />
+              Calculadora de Sizing & Stop Loss Automático
+            </h2>
+            <p className="text-xs text-slate-400 mb-5">
+              Baseado no capital disponível, Z-Score atual, ATR e Beta do par, calcula tamanho de posição e níveis de proteção.
+            </p>
+
+            {/* Input de Capital */}
+            <div className="flex flex-wrap gap-4 items-end mb-6">
+              <div>
+                <label className="text-xs text-slate-400 block mb-1.5">Capital Disponível (R$)</label>
+                <input
+                  type="number" min="1000" step="1000"
+                  value={capitalReais}
+                  onChange={e => setCapitalReais(Number(e.target.value))}
+                  className="input-dark w-40 font-mono"
+                />
+              </div>
+              <button
+                onClick={handleCalculateSizing}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-violet-500 text-slate-950 text-sm font-bold hover:opacity-90 transition-all shadow-lg shadow-cyan-500/20 flex items-center gap-2"
+              >
+                <Calculator className="w-4 h-4" />
+                Calcular
+              </button>
+            </div>
+
+            {stopLossResult && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Sizing */}
+                <div className="bg-white/5 rounded-xl border border-white/10 p-4 space-y-3">
+                  <h3 className="text-xs font-bold text-cyan-400 uppercase tracking-wider">📦 Sizing da Posição</h3>
+                  <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                    <span className="text-xs text-slate-400">{stock1Symbol} (LONG)</span>
+                    <span className="font-mono font-bold text-emerald-400">{stopLossResult.qty1} ações</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                    <span className="text-xs text-slate-400">{stock2Symbol} (SHORT)</span>
+                    <span className="font-mono font-bold text-red-400">{stopLossResult.qty2} ações</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1.5">
+                    <span className="text-xs text-slate-400">Capital Total Alocado</span>
+                    <span className="font-mono font-bold text-white">R$ {capitalReais.toLocaleString('pt-BR')}</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Sizing balanceado usando Beta = {pairStats.beta} para neutralidade direcional.
+                  </p>
+                </div>
+
+                {/* Stop Loss & Take Profit */}
+                <div className="bg-white/5 rounded-xl border border-white/10 p-4 space-y-3">
+                  <h3 className="text-xs font-bold text-violet-400 uppercase tracking-wider">🎯 Níveis de Controle de Risco</h3>
+                  <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                    <span className="text-xs text-slate-400">Spread Atual (Entrada)</span>
+                    <span className="font-mono font-bold text-white">R$ {latestSpread.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                    <span className="text-xs text-slate-400">🔴 Stop Loss (Spread)</span>
+                    <span className="font-mono font-bold text-red-400">R$ {stopLossResult.stopLossSpread.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                    <span className="text-xs text-slate-400">🟢 Take Profit (Spread)</span>
+                    <span className="font-mono font-bold text-emerald-400">R$ {stopLossResult.takeProfitSpread.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                    <span className="text-xs text-slate-400">📊 Risk/Reward</span>
+                    <span className={`font-mono font-bold ${stopLossResult.riskRewardRatio >= 1.5 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                      1 : {stopLossResult.riskRewardRatio}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                    <span className="text-xs text-slate-400">Perda Máxima Est.</span>
+                    <span className="font-mono font-bold text-red-400">- R$ {stopLossResult.maxLossReais.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1.5">
+                    <span className="text-xs text-slate-400">Ganho Máximo Est.</span>
+                    <span className="font-mono font-bold text-emerald-400">+ R$ {stopLossResult.maxGainReais.toFixed(2)}</span>
+                  </div>
+                </div>
+
+                {/* ATR */}
+                <div className="col-span-1 md:col-span-2 bg-amber-500/5 rounded-xl border border-amber-500/20 p-4">
+                  <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-2">⚡ ATR — Volatilidade Média Diária do Spread</h3>
+                  <div className="flex flex-wrap gap-6">
+                    <div>
+                      <span className="text-2xl font-black font-mono text-white">{pairStats.atr}</span>
+                      <span className="text-xs text-slate-400 ml-1">R$ por período</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 self-center max-w-md">
+                      O ATR mede o range médio de oscilação do spread por período. Ele define o buffer de proteção do stop loss
+                      (1.5× ATR além do spread atual) e calibra o sizing para absorver a volatilidade normal sem acionar paradas prematuras.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════
+          TAB: WATCHLIST — Múltiplos Pares (F)
+      ════════════════════════════════════ */}
+      {activeTab === 'watchlist' && (
+        <div className="animate-fade-in space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-bold text-white flex items-center gap-2">
+              <Search className="w-5 h-5 text-cyan-400" />
+              Watchlist de Pares — Monitoramento Simultâneo
+            </h2>
+            <span className="text-xs text-slate-400">{WATCHLIST_PAIRS.length} pares monitorados</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {WATCHLIST_PAIRS.map(([s1, s2]) => {
+              const isActive = s1 === stock1Symbol && s2 === stock2Symbol;
+              return (
+                <button
+                  key={`${s1}-${s2}`}
+                  onClick={() => { setStock1Symbol(s1); setStock2Symbol(s2); setActiveTab('resumo'); }}
+                  className={`text-left p-4 rounded-2xl border transition-all hover:scale-[1.02] ${
+                    isActive
+                      ? 'glass border-cyan-500/50 shadow-glow-cyan bg-cyan-500/10'
+                      : 'glass border-white/10 hover:border-white/20'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-bold text-cyan-400 text-sm">{s1}</span>
+                      <span className="text-slate-600 text-xs">vs</span>
+                      <span className="font-mono font-bold text-violet-400 text-sm">{s2}</span>
+                    </div>
+                    {isActive && (
+                      <span className="text-[10px] bg-cyan-500 text-slate-950 font-black px-1.5 py-0.5 rounded uppercase">ATIVO</span>
+                    )}
+                  </div>
+                  {isActive && (
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-400">Z-Score</span>
+                        <span className={`font-mono font-bold ${latestZScore >= 1.5 ? 'text-red-400' : latestZScore <= -1.5 ? 'text-emerald-400' : 'text-slate-300'}`}>
+                          {latestZScore >= 0 ? '+' : ''}{latestZScore.toFixed(2)} σ
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-400">Spread</span>
+                        <span className="font-mono text-white">R$ {latestSpread.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-400">Correlação</span>
+                        <span className="font-mono text-cyan-400">{(pairStats.correlation * 100).toFixed(0)}%</span>
+                      </div>
+                      <div className={`mt-2 text-center text-[11px] font-bold py-1 rounded-lg ${
+                        signal === 'LONG' ? 'bg-emerald-500/20 text-emerald-300' :
+                        signal === 'SHORT' ? 'bg-red-500/20 text-red-300' :
+                        'bg-white/5 text-slate-400'
+                      }`}>
+                        {signal === 'LONG' ? '🟢 LONG' : signal === 'SHORT' ? '🔴 SHORT' : '⚪ NEUTRO'}
+                      </div>
+                    </div>
+                  )}
+                  {!isActive && (
+                    <div className="text-xs text-slate-500 mt-1">
+                      Clique para analisar este par →
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════
+          TAB: HISTÓRICO DE SINAIS (H)
+      ════════════════════════════════════ */}
+      {activeTab === 'historico' && (
+        <div className="space-y-4 animate-fade-in">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <h2 className="text-base font-bold text-white flex items-center gap-2">
+              <History className="w-5 h-5 text-violet-400" />
+              Diário de Sinais Operacionais
+            </h2>
+            <button
+              onClick={() => { clearSignals(); setSignalHistory([]); }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs text-red-400 border border-red-500/20 hover:bg-red-500/10 transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Limpar Histórico
+            </button>
+          </div>
+
+          {signalHistory.length === 0 ? (
+            <div className="glass rounded-2xl p-10 border border-white/10 text-center">
+              <History className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+              <p className="text-slate-400 font-medium">Nenhum sinal registrado ainda.</p>
+              <p className="text-slate-500 text-xs mt-1">Os sinais LONG e SHORT são registrados automaticamente quando gerados.</p>
+            </div>
+          ) : (
+            <div className="glass rounded-2xl border border-white/10 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-xs">
+                  <thead className="bg-white/5 text-slate-400 uppercase tracking-wider text-[11px]">
+                    <tr>
+                      <th className="py-2 px-4 text-left">Data / Hora</th>
+                      <th className="py-2 px-4 text-left">Par</th>
+                      <th className="py-2 px-4 text-center">Sinal</th>
+                      <th className="py-2 px-4 text-center">Spread</th>
+                      <th className="py-2 px-4 text-center">Z-Score</th>
+                      <th className="py-2 px-4 text-left">Sugestão</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5 font-mono">
+                    {signalHistory.map(rec => (
+                      <tr key={rec.id} className="hover:bg-white/5 transition-colors">
+                        <td className="py-2.5 px-4 text-slate-400 text-[11px]">
+                          {new Date(rec.timestamp).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                        </td>
+                        <td className="py-2.5 px-4 font-bold text-slate-200">{rec.pair}</td>
+                        <td className="py-2.5 px-4 text-center">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            rec.signal === 'LONG' ? 'bg-emerald-500/20 text-emerald-300' :
+                            rec.signal === 'SHORT' ? 'bg-red-500/20 text-red-300' :
+                            'bg-white/10 text-slate-400'
+                          }`}>
+                            {rec.signal}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-4 text-center text-slate-300">R${rec.spread.toFixed(2)}</td>
+                        <td className={`py-2.5 px-4 text-center font-bold ${Math.abs(rec.zScore) >= 1.5 ? (rec.zScore < 0 ? 'text-emerald-400' : 'text-red-400') : 'text-slate-400'}`}>
+                          {rec.zScore >= 0 ? '+' : ''}{rec.zScore.toFixed(2)} σ
+                        </td>
+                        <td className="py-2.5 px-4 text-slate-400 text-[11px] max-w-[180px] truncate">{rec.camadaSugestao ?? '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
