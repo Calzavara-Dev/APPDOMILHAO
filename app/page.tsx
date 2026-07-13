@@ -378,18 +378,18 @@ const calculateBandasCamadas = (
 // ─────────────────────────────────────────
 // TAB DEFINITIONS
 // ─────────────────────────────────────────
-type TabKey = 'resumo' | 'camadas' | 'ocorrencias' | 'estatisticas' | 'ferramentas' | 'backtest' | 'watchlist' | 'historico' | 'configuracoes';
-const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
-  { key: 'resumo', label: 'Resumo', icon: <Activity className="w-3.5 h-3.5" /> },
-  { key: 'camadas', label: 'Bandas & Camadas', icon: <Layers className="w-3.5 h-3.5" /> },
-  { key: 'backtest', label: 'Backtest', icon: <FlaskConical className="w-3.5 h-3.5" /> },
-  { key: 'ferramentas', label: 'Calculadora', icon: <Calculator className="w-3.5 h-3.5" /> },
-  { key: 'watchlist', label: 'Watchlist', icon: <Search className="w-3.5 h-3.5" /> },
-  { key: 'historico', label: 'Histórico', icon: <History className="w-3.5 h-3.5" /> },
-  { key: 'ocorrencias', label: 'Ocorrências', icon: <Target className="w-3.5 h-3.5" /> },
-  { key: 'estatisticas', label: 'Estatísticas', icon: <BarChart2 className="w-3.5 h-3.5" /> },
-  { key: 'configuracoes', label: 'Config', icon: <Settings className="w-3.5 h-3.5" /> },
+// FLUXO DE ANÁLISE EM ETAPAS (PIPELINE)
+// ─────────────────────────────────────────
+type TabKey = 'diagnostico' | 'graficos' | 'camadas' | 'calculadora' | 'backtest' | 'watchlist';
+const TABS: { key: TabKey; label: string; step: string; icon: React.ReactNode }[] = [
+  { key: 'diagnostico', step: '01', label: 'Diagnóstico & Termômetro', icon: <Compass className="w-4 h-4" /> },
+  { key: 'graficos', step: '02', label: 'Gráficos & Z-Score', icon: <Activity className="w-4 h-4" /> },
+  { key: 'camadas', step: '03', label: 'Grade & Frequência', icon: <Layers className="w-4 h-4" /> },
+  { key: 'calculadora', step: '04', label: 'Calculadora & Risco', icon: <Calculator className="w-4 h-4" /> },
+  { key: 'backtest', step: '05', label: 'Backtest & Simulação', icon: <FlaskConical className="w-4 h-4" /> },
+  { key: 'watchlist', step: '06', label: 'Watchlist & Histórico', icon: <Search className="w-4 h-4" /> },
 ];
+
 
 // ─────────────────────────────────────────
 // MAIN COMPONENT
@@ -441,7 +441,9 @@ function StockPairAnalyzer() {
   const [livePrice2, setLivePrice2] = useState<number | null>(null);
   const [liveChange1, setLiveChange1] = useState<number | null>(null);
   const [liveChange2, setLiveChange2] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<TabKey>('resumo');
+  const [activeTab, setActiveTab] = useState<TabKey>('diagnostico');
+  const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
+  const [leverage, setLeverage] = useState<number>(1);
   const [copiedReport, setCopiedReport] = useState<boolean>(false);
 
   // ── Dark / Light Mode ──
@@ -1121,10 +1123,10 @@ function StockPairAnalyzer() {
                 {dataSource === 'real' ? 'Dados Reais' : 'Simulado'}
               </span>
               <button
-                onClick={() => setActiveTab('ocorrencias')}
+                onClick={() => setActiveTab('camadas')}
                 className="inline-flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
               >
-                <ChevronRight className="w-3 h-3" /> Ocorrências
+                <ChevronRight className="w-3 h-3" /> Grade & Frequência
               </button>
             </div>
 
@@ -1161,7 +1163,7 @@ function StockPairAnalyzer() {
               </Select>
 
               <button
-                onClick={() => setActiveTab('configuracoes')}
+                onClick={() => setShowSettingsModal(true)}
                 className="w-9 h-9 rounded-xl glass hover:border-white/20 transition-all flex items-center justify-center text-slate-400 hover:text-slate-200"
                 aria-label="Configurações"
               >
@@ -1205,11 +1207,12 @@ function StockPairAnalyzer() {
       </header>
 
       {/* ════════════════════════════════════
-          FAROL OPERACIONAL & ACTIONABLE INSIGHTS
+          COCKPIT EXECUTIVO DO PAR (BARRA OPERACIONAL COMPACTA)
       ════════════════════════════════════ */}
-      <div className="mb-6 p-4 md:p-5 rounded-2xl glass border border-white/10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="mb-6 p-4 rounded-2xl glass border border-white/10 flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4">
+        {/* Lado esquerdo: Farol e Sinal */}
         <div className="flex items-center gap-3.5">
-          <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
+          <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${
             latestZScore <= -1.5 || signal === 'LONG'
               ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-400'
               : latestZScore >= 1.5 || signal === 'SHORT'
@@ -1226,7 +1229,7 @@ function StockPairAnalyzer() {
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Farol Quantitativo</span>
+              <span className="text-xs font-black uppercase tracking-wider text-slate-400">Farol Quantitativo</span>
               <span className={`px-2 py-0.5 rounded-full text-[11px] font-extrabold uppercase tracking-wide border ${
                 latestZScore <= -1.5 || signal === 'LONG'
                   ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
@@ -1241,21 +1244,34 @@ function StockPairAnalyzer() {
                   : '⚪ Equilíbrio Gaussiano / Neutro'}
               </span>
             </div>
-            <p className="text-sm font-semibold text-white mt-1">
-              {latestZScore <= -1.5 || signal === 'LONG'
-                ? `Spread sobrevendido (Z: ${latestZScore.toFixed(2)} σ). Alta probabilidade de retorno à média.`
-                : latestZScore >= 1.5 || signal === 'SHORT'
-                ? `Spread sobrecomprado (Z: +${latestZScore.toFixed(2)} σ). Oportunidade de compressão de par.`
-                : `Spread dentro da faixa normal de frequência (${bandaFreqPercent}%). Operação na média.`}
+            <p className="text-xs font-semibold text-white mt-1">
+              {stock1Symbol} vs {stock2Symbol} — Spread atual: <strong className="font-mono text-cyan-300">R$ {latestSpread.toFixed(2)}</strong> ({latestZScore >= 0 ? "+" : ""}{latestZScore.toFixed(2)} σ)
             </p>
           </div>
         </div>
 
-        {/* Botões de Ação Rápida */}
-        <div className="flex items-center gap-2.5 w-full md:w-auto">
+        {/* Lado direito: 4 KPIs essenciais compactos + Ação */}
+        <div className="flex items-center gap-3 flex-wrap xl:flex-nowrap w-full xl:w-auto justify-between xl:justify-end">
+          <div className="flex items-center gap-4 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs">
+            <div>
+              <span className="text-slate-400 block text-[10px] uppercase font-bold">Correlação</span>
+              <span className="font-mono font-bold text-white">{(pairStats.correlation * 100).toFixed(0)}% (R² {pairStats.rSquared})</span>
+            </div>
+            <div className="w-px h-6 bg-white/10" />
+            <div>
+              <span className="text-slate-400 block text-[10px] uppercase font-bold">Meia-Vida</span>
+              <span className="font-mono font-bold text-violet-300">~{pairStats.halfLifeDays} dias</span>
+            </div>
+            <div className="w-px h-6 bg-white/10" />
+            <div>
+              <span className="text-slate-400 block text-[10px] uppercase font-bold">Beta</span>
+              <span className="font-mono font-bold text-cyan-300">{pairStats.beta}</span>
+            </div>
+          </div>
+
           <button
             onClick={handleCopyReport}
-            className="flex-1 md:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-cyan-500 to-violet-500 text-slate-950 hover:opacity-90 transition-all shadow-lg shadow-cyan-500/20"
+            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-cyan-500 to-violet-500 text-slate-950 hover:opacity-90 transition-all shadow-lg shadow-cyan-500/20 shrink-0"
           >
             {copiedReport ? (
               <>
@@ -1265,7 +1281,7 @@ function StockPairAnalyzer() {
             ) : (
               <>
                 <Share2 className="w-4 h-4" />
-                <span>Copiar Estudo (WhatsApp)</span>
+                <span>Copiar Estudo</span>
               </>
             )}
           </button>
@@ -1273,94 +1289,29 @@ function StockPairAnalyzer() {
       </div>
 
       {/* ════════════════════════════════════
-          TERMÔMETRO DIDÁTICO DO Z-SCORE
-      ════════════════════════════════════ */}
-      <ZScoreThermometer
-        zScore={latestZScore}
-        stock1Symbol={stock1Symbol}
-        stock2Symbol={stock2Symbol}
-        halfLifeDays={pairStats.halfLifeDays}
-        spreadValue={latestSpread}
-      />
-
-      {/* ════════════════════════════════════
-          KPI CARDS
-      ════════════════════════════════════ */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {/* Signal */}
-        <div className="kpi-card animate-fade-in-up col-span-2 lg:col-span-1" style={{ borderColor: sc.border, background: sc.bg }}>
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Sinal Z-Score</span>
-            <sc.Icon className={`w-4 h-4 ${sc.cls} animate-pulse-glow`} />
-          </div>
-          <div className={`text-3xl font-black tracking-tight ${sc.cls}`}>{sc.label}</div>
-          <div className="mt-2 text-xs text-slate-500">
-            Desvio Padrão: <span className="text-slate-300 font-mono font-semibold">{latestZScore.toFixed(2)} σ</span>
-          </div>
-        </div>
-
-        {/* Spread atual */}
-        <div className="kpi-card animate-fade-in-up delay-100">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Spread Atual</span>
-            <Radio className="w-4 h-4 text-cyan-400" />
-          </div>
-          <div className={`text-2xl font-black font-mono ${latestSpread >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-            R$ {latestSpread.toFixed(2)}
-          </div>
-          <div className="mt-2 text-xs text-slate-500">
-            {stock1Symbol} <span className="text-slate-600">−</span> {stock2Symbol}
-          </div>
-        </div>
-
-        {/* Correlação do Par */}
-        <div className="kpi-card animate-fade-in-up delay-200 border border-cyan-500/20">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider">Correlação do Par</span>
-            <Award className="w-4 h-4 text-cyan-400" />
-          </div>
-          <div className="text-2xl font-black font-mono text-white">
-            {(pairStats.correlation * 100).toFixed(0)}%
-          </div>
-          <div className="mt-2 text-xs text-slate-500">
-            R²: <span className="text-cyan-300 font-mono">{pairStats.rSquared}</span> · Beta: <span className="text-cyan-300 font-mono">{pairStats.beta}</span>
-          </div>
-        </div>
-
-        {/* Meia-Vida (Retorno à Média) */}
-        <div className="kpi-card animate-fade-in-up delay-300 border border-violet-500/20">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold text-violet-400 uppercase tracking-wider">Meia-Vida (Half-Life)</span>
-            <Clock className="w-4 h-4 text-violet-400" />
-          </div>
-          <div className="text-2xl font-black font-mono text-white">
-            ~{pairStats.halfLifeDays} <span className="text-sm font-normal text-slate-400">dias</span>
-          </div>
-          <div className="mt-2 text-xs text-slate-500">
-            Tempo est. de reversão à média
-          </div>
-        </div>
-      </div>
-
-      {/* ════════════════════════════════════
-          TABS
+          FLUXO DE ANÁLISE — ABAS (PIPELINE)
       ════════════════════════════════════ */}
       <div className="mb-6 overflow-x-auto">
-        <div className="inline-flex gap-1 p-1 rounded-2xl glass min-w-max">
+        <div className="inline-flex gap-1.5 p-1.5 rounded-2xl glass min-w-max border border-white/10">
           {TABS.map(tab => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
               className={`
-                flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 whitespace-nowrap
+                flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 whitespace-nowrap
                 ${activeTab === tab.key
-                  ? 'tab-active'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                  ? 'bg-gradient-to-r from-cyan-500 to-violet-500 text-slate-950 shadow-md shadow-cyan-500/20 scale-[1.02]'
+                  : 'text-slate-400 hover:text-white hover:bg-white/5'
                 }
               `}
             >
+              <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-black ${
+                activeTab === tab.key ? 'bg-slate-950/20 text-slate-950' : 'bg-white/5 text-slate-400'
+              }`}>
+                {tab.step}
+              </span>
               {tab.icon}
-              {tab.label}
+              <span>{tab.label}</span>
             </button>
           ))}
         </div>
@@ -1369,8 +1320,21 @@ function StockPairAnalyzer() {
       {/* ════════════════════════════════════
           TAB: RESUMO
       ════════════════════════════════════ */}
-      {activeTab === 'resumo' && (
-        <div className="space-y-4 animate-fade-in">
+      {/* ════════════════════════════════════
+          ETAPA 01: DIAGNÓSTICO & TERMÔMETRO ('diagnostico')
+      ════════════════════════════════════ */}
+      {(activeTab === 'diagnostico' || (activeTab as any) === 'resumo') && (
+        <div className="space-y-6 animate-fade-in">
+          {/* 1. Termômetro Didático do Z-Score */}
+          <ZScoreThermometer
+            zScore={latestZScore}
+            stock1Symbol={stock1Symbol}
+            stock2Symbol={stock2Symbol}
+            halfLifeDays={pairStats.halfLifeDays}
+            spreadValue={latestSpread}
+          />
+
+          {/* 2. Cards das Cotações Lado a Lado */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Stock 1 Card */}
             <div className="glass rounded-2xl p-6 border border-cyan-500/20 hover:border-cyan-500/40 transition-all">
@@ -1386,7 +1350,7 @@ function StockPairAnalyzer() {
               <div className="text-4xl font-black text-white font-mono">
                 R$ {getLatestPrice(stock1Data).toFixed(2)}
               </div>
-              <div className="mt-3 text-xs text-slate-500">Preço de fechamento mais recente</div>
+              <div className="mt-3 text-xs text-slate-500">Preço mais recente no período ({dataSource})</div>
             </div>
 
             {/* Stock 2 Card */}
@@ -1403,16 +1367,35 @@ function StockPairAnalyzer() {
               <div className="text-4xl font-black text-white font-mono">
                 R$ {getLatestPrice(stock2Data).toFixed(2)}
               </div>
-              <div className="mt-3 text-xs text-slate-500">Preço de fechamento mais recente</div>
+              <div className="mt-3 text-xs text-slate-500">Preço mais recente no período ({dataSource})</div>
             </div>
           </div>
 
-          {/* Spread History mini */}
-          <div className="glass rounded-2xl p-5 border border-white/5">
-            <h3 className="text-sm font-semibold text-slate-300 mb-4">Spread Recente</h3>
-            <div className="h-48">
+          {/* 3. Ação Próxima Etapa */}
+          <div className="flex justify-end">
+            <button
+              onClick={() => setActiveTab('graficos')}
+              className="px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-violet-500 text-slate-950 font-bold text-sm hover:opacity-90 transition-all shadow-lg shadow-cyan-500/20 flex items-center gap-2"
+            >
+              <span>Próxima Etapa: Gráficos & Z-Score</span>
+              <span>→</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════
+          ETAPA 02: GRÁFICOS & Z-SCORE ('graficos')
+      ════════════════════════════════════ */}
+      {activeTab === 'graficos' && (
+        <div className="space-y-6 animate-fade-in">
+          {/* Gráfico do Spread Completo */}
+          <div className="glass rounded-2xl p-6 border border-white/10">
+            <h3 className="text-base font-bold text-white mb-1">Evolução Histórica do Spread</h3>
+            <p className="text-xs text-slate-400 mb-4">Diferença de preços ({stock1Symbol} − {stock2Symbol}) em R$ ao longo do período selecionado</p>
+            <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={spreadData.slice(-30)}>
+                <LineChart data={spreadData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsla(210,40%,96%,0.04)" />
                   <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={v => { const d = new Date(v); return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }); }} />
                   <YAxis tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={v => `R$${v}`} />
@@ -1424,47 +1407,65 @@ function StockPairAnalyzer() {
             </div>
           </div>
 
-          {/* Destaque Principal: Painel Completo de Frequência & Camadas */}
-          {renderBandasCamadasPanel()}
-        </div>
-      )}
-
-      {/* ════════════════════════════════════
-          TAB: BANDAS & CAMADAS ('camadas')
-      ════════════════════════════════════ */}
-      {activeTab === 'camadas' && renderBandasCamadasPanel()}
-
-      {/* ════════════════════════════════════
-          TAB: ESTATÍSTICAS
-      ════════════════════════════════════ */}
-      {activeTab === 'estatisticas' && (
-        <div className="animate-fade-in space-y-4">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {[
-              { label: 'Dentro de ±0.5σ', value: distributionStats.withinHalfSigma.count, pct: distributionStats.total > 0 ? (distributionStats.withinHalfSigma.count / distributionStats.total) * 100 : 0, color: 'text-cyan-400', border: 'border-cyan-500/20', p1: distributionStats.withinHalfSigma.avgPrice1, p2: distributionStats.withinHalfSigma.avgPrice2 },
-              { label: 'Entre 0.5σ e 1σ', value: distributionStats.withinOneSigma.count - distributionStats.withinHalfSigma.count, pct: distributionStats.total > 0 ? ((distributionStats.withinOneSigma.count - distributionStats.withinHalfSigma.count) / distributionStats.total) * 100 : 0, color: 'text-emerald-400', border: 'border-emerald-500/20', p1: distributionStats.withinOneSigma.avgPrice1, p2: distributionStats.withinOneSigma.avgPrice2 },
-              { label: 'Entre 1σ e 2σ', value: distributionStats.withinTwoSigma.count - distributionStats.withinOneSigma.count, pct: distributionStats.total > 0 ? ((distributionStats.withinTwoSigma.count - distributionStats.withinOneSigma.count) / distributionStats.total) * 100 : 0, color: 'text-violet-400', border: 'border-violet-500/20', p1: distributionStats.withinTwoSigma.avgPrice1, p2: distributionStats.withinTwoSigma.avgPrice2 },
-              { label: 'Acima de 2σ', value: distributionStats.beyondTwoSigma.count, pct: distributionStats.total > 0 ? (distributionStats.beyondTwoSigma.count / distributionStats.total) * 100 : 0, color: 'text-red-400', border: 'border-red-500/20', p1: distributionStats.beyondTwoSigma.avgPrice1, p2: distributionStats.beyondTwoSigma.avgPrice2 },
-            ].map((stat, i) => (
-              <div key={i} className={`glass rounded-2xl p-5 border ${stat.border} animate-fade-in-up`} style={{ animationDelay: `${i * 0.1}s` }}>
-                <p className="text-xs text-slate-500 mb-2">{stat.label}</p>
-                <div className={`text-2xl font-black ${stat.color}`}>{typeof stat.value === 'number' ? stat.value.toFixed(1) : stat.value}</div>
-                <div className="text-xs text-slate-500 mt-1">{stat.pct.toFixed(1)}% do total</div>
-                <div className="section-divider my-2" />
-                <div className="text-xs text-slate-500 space-y-0.5">
-                  <p><span className="text-cyan-400 font-mono">{stock1Symbol}</span> R$ {stat.p1.toFixed(2)}</p>
-                  <p><span className="text-violet-400 font-mono">{stock2Symbol}</span> R$ {stat.p2.toFixed(2)}</p>
+          {/* Cards Estatísticos de Sigma */}
+          <div className="glass rounded-2xl p-6 border border-white/5">
+            <h3 className="text-sm font-bold text-white mb-4 uppercase tracking-wider">Frequência por Desvio Padrão (Distribuição σ)</h3>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {[
+                { label: 'Dentro de ±0.5σ', value: distributionStats.withinHalfSigma.count, pct: distributionStats.total > 0 ? (distributionStats.withinHalfSigma.count / distributionStats.total) * 100 : 0, color: 'text-cyan-400', border: 'border-cyan-500/20', p1: distributionStats.withinHalfSigma.avgPrice1, p2: distributionStats.withinHalfSigma.avgPrice2 },
+                { label: 'Entre 0.5σ e 1σ', value: distributionStats.withinOneSigma.count - distributionStats.withinHalfSigma.count, pct: distributionStats.total > 0 ? ((distributionStats.withinOneSigma.count - distributionStats.withinHalfSigma.count) / distributionStats.total) * 100 : 0, color: 'text-emerald-400', border: 'border-emerald-500/20', p1: distributionStats.withinOneSigma.avgPrice1, p2: distributionStats.withinOneSigma.avgPrice2 },
+                { label: 'Entre 1σ e 2σ', value: distributionStats.withinTwoSigma.count - distributionStats.withinOneSigma.count, pct: distributionStats.total > 0 ? ((distributionStats.withinTwoSigma.count - distributionStats.withinOneSigma.count) / distributionStats.total) * 100 : 0, color: 'text-violet-400', border: 'border-violet-500/20', p1: distributionStats.withinTwoSigma.avgPrice1, p2: distributionStats.withinTwoSigma.avgPrice2 },
+                { label: 'Acima de 2σ', value: distributionStats.beyondTwoSigma.count, pct: distributionStats.total > 0 ? (distributionStats.beyondTwoSigma.count / distributionStats.total) * 100 : 0, color: 'text-red-400', border: 'border-red-500/20', p1: distributionStats.beyondTwoSigma.avgPrice1, p2: distributionStats.beyondTwoSigma.avgPrice2 },
+              ].map((stat, i) => (
+                <div key={i} className={`glass rounded-2xl p-5 border ${stat.border} animate-fade-in-up`} style={{ animationDelay: `${i * 0.1}s` }}>
+                  <p className="text-xs text-slate-500 mb-2">{stat.label}</p>
+                  <div className={`text-2xl font-black ${stat.color}`}>{typeof stat.value === 'number' ? stat.value.toFixed(1) : stat.value}</div>
+                  <div className="text-xs text-slate-500 mt-1">{stat.pct.toFixed(1)}% do total</div>
+                  <div className="section-divider my-2" />
+                  <div className="text-xs text-slate-500 space-y-0.5">
+                    <p><span className="text-cyan-400 font-mono">{stock1Symbol}</span> R$ {stat.p1.toFixed(2)}</p>
+                    <p><span className="text-violet-400 font-mono">{stock2Symbol}</span> R$ {stat.p2.toFixed(2)}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+          </div>
+
+          {/* Botão Próximo Passo */}
+          <div className="flex justify-end">
+            <button
+              onClick={() => setActiveTab('camadas')}
+              className="px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-violet-500 text-slate-950 font-bold text-sm hover:opacity-90 transition-all shadow-lg shadow-cyan-500/20 flex items-center gap-2"
+            >
+              <span>Próxima Etapa: Grade & Frequência</span>
+              <span>→</span>
+            </button>
           </div>
         </div>
       )}
 
       {/* ════════════════════════════════════
-          TAB: OCORRÊNCIAS
+          ETAPA 03: GRADE & FREQUÊNCIA ('camadas')
       ════════════════════════════════════ */}
-      {activeTab === 'ocorrencias' && (
+      {activeTab === 'camadas' && (
+        <div className="space-y-6 animate-fade-in">
+          {renderBandasCamadasPanel()}
+          <div className="flex justify-end">
+            <button
+              onClick={() => setActiveTab('calculadora')}
+              className="px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-violet-500 text-slate-950 font-bold text-sm hover:opacity-90 transition-all shadow-lg shadow-cyan-500/20 flex items-center gap-2"
+            >
+              <span>Próxima Etapa: Calculadora & Risco</span>
+              <span>→</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════
+          TAB: OCORRÊNCIAS (Legado / Opcional)
+      ════════════════════════════════════ */}
+      {(activeTab as any) === 'ocorrencias' && (
         <div className="animate-fade-in space-y-6">
           {/* Gaussian bands */}
           <div className="glass rounded-2xl p-6 border border-white/5">
@@ -1611,152 +1612,193 @@ function StockPairAnalyzer() {
         </div>
       )}
 
-
-
       {/* ════════════════════════════════════
-          TAB: CONFIGURAÇÕES
+          MODAL: CONFIGURAÇÕES GERAIS (TEMPO, TOKEN, HISTOGRAMA)
       ════════════════════════════════════ */}
-      {activeTab === 'configuracoes' && (
-        <div className="animate-fade-in space-y-4 max-w-3xl">
+      {showSettingsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="glass rounded-3xl border border-white/10 max-h-[90vh] overflow-y-auto w-full max-w-3xl p-6 space-y-6 shadow-2xl relative">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <Settings className="w-5 h-5 text-cyan-400" />
+                Configurações & Parâmetros do App
+              </h2>
+              <button
+                onClick={() => setShowSettingsModal(false)}
+                className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-all"
+              >
+                ✕
+              </button>
+            </div>
 
-          {/* API Token config */}
-          <div className="glass rounded-2xl p-6 border border-white/5">
-            <h3 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
-              <Zap className="w-4 h-4 text-amber-400" /> Token API brapi.dev
-            </h3>
-            <p className="text-xs text-slate-400 mb-4 leading-relaxed">
-              O app consulta cotações reais brasileiras (B3). Os ativos <code className="text-cyan-400 bg-white/5 px-1 py-0.5 rounded">PETR4</code>, <code className="text-cyan-400 bg-white/5 px-1 py-0.5 rounded">VALE3</code>, <code className="text-cyan-400 bg-white/5 px-1 py-0.5 rounded">MGLU3</code> e <code className="text-cyan-400 bg-white/5 px-1 py-0.5 rounded">ITUB4</code> são de uso gratuito ilimitado. Para analisar qualquer outra ação brasileira, insira seu token.
-            </p>
-            <div className="flex gap-2">
-              <input
-                type="password"
-                className="input-dark flex-1"
-                placeholder="Insira seu token brapi.dev"
-                value={brapiToken}
-                onChange={e => setBrapiToken(e.target.value)}
-              />
-              {brapiToken && (
+            {/* API Token config */}
+            <div className="glass rounded-2xl p-6 border border-white/5">
+              <h3 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
+                <Zap className="w-4 h-4 text-amber-400" /> Token API brapi.dev
+              </h3>
+              <p className="text-xs text-slate-400 mb-4 leading-relaxed">
+                O app consulta cotações reais brasileiras (B3). Os ativos <code className="text-cyan-400 bg-white/5 px-1 py-0.5 rounded">PETR4</code>, <code className="text-cyan-400 bg-white/5 px-1 py-0.5 rounded">VALE3</code>, <code className="text-cyan-400 bg-white/5 px-1 py-0.5 rounded">MGLU3</code> e <code className="text-cyan-400 bg-white/5 px-1 py-0.5 rounded">ITUB4</code> são de uso gratuito ilimitado. Para analisar qualquer outra ação brasileira, insira seu token.
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="password"
+                  className="input-dark flex-1"
+                  placeholder="Insira seu token brapi.dev"
+                  value={brapiToken}
+                  onChange={e => setBrapiToken(e.target.value)}
+                />
+                {brapiToken && (
+                  <button
+                    onClick={() => setBrapiToken('')}
+                    className="px-3 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-semibold transition-all border border-red-500/20 animate-fade-in"
+                  >
+                    Limpar
+                  </button>
+                )}
+              </div>
+              <p className="text-[10px] text-slate-500 mt-2">
+                Crie uma conta em <a href="https://brapi.dev" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">brapi.dev</a> para obter um token de acesso instantâneo.
+              </p>
+            </div>
+
+            {/* Update + Period */}
+            <div className="glass rounded-2xl p-6 border border-white/5">
+              <h3 className="text-sm font-bold text-white mb-5 flex items-center gap-2">
+                <Clock className="w-4 h-4 text-cyan-400" /> Tempo & Período
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-xs text-slate-400 mb-2 block">Atualização</label>
+                  <Select value={updateInterval.toString()} onValueChange={v => setUpdateInterval(Number(v))}>
+                    <SelectTrigger className="bg-fin-surface1 border-white/10 text-slate-200">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={APP_CONFIG.TIMING.UPDATE_INTERVALS.FAST.toString()}>30s</SelectItem>
+                      <SelectItem value={APP_CONFIG.TIMING.UPDATE_INTERVALS.REALTIME.toString()}>60s</SelectItem>
+                      <SelectItem value={APP_CONFIG.TIMING.UPDATE_INTERVALS.MEDIUM.toString()}>2min</SelectItem>
+                      <SelectItem value={APP_CONFIG.TIMING.UPDATE_INTERVALS.SLOW.toString()}>5min</SelectItem>
+                      <SelectItem value={APP_CONFIG.TIMING.UPDATE_INTERVALS.HOURLY.toString()}>1h</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400 mb-2 block">Período Histórico</label>
+                  <Select value={historyDays.toString()} onValueChange={v => setHistoryDays(Number(v))}>
+                    <SelectTrigger className="bg-fin-surface1 border-white/10 text-slate-200">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[30, 60, 90, 120, 150].map(d => <SelectItem key={d} value={d.toString()}>{d} dias</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400 mb-2 block">Bins Histograma</label>
+                  <Select value={histBins.toString()} onValueChange={v => setHistBins(Number(v))}>
+                    <SelectTrigger className="bg-fin-surface1 border-white/10 text-slate-200">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[10, 20, 30, 40].map(b => <SelectItem key={b} value={b.toString()}>{b} bins</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
+            {/* Occurrences settings */}
+            <div className="glass rounded-2xl p-6 border border-white/5">
+              <h3 className="text-sm font-bold text-white mb-5 flex items-center gap-2">
+                <Target className="w-4 h-4 text-violet-400" /> Ocorrências
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="text-xs text-slate-400 mb-2 block">Limite</label>
+                  <Select value={occLimit.toString()} onValueChange={v => setOccLimit(Number(v))}>
+                    <SelectTrigger className="bg-fin-surface1 border-white/10 text-slate-200">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[10, 20, 50, 100].map(n => <SelectItem key={n} value={n.toString()}>{n}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400 mb-2 block">Ordenação</label>
+                  <Select value={occSort} onValueChange={(v: any) => setOccSort(v)}>
+                    <SelectTrigger className="bg-fin-surface1 border-white/10 text-slate-200">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="recent">Mais recentes</SelectItem>
+                      <SelectItem value="spread_desc">Maior spread</SelectItem>
+                      <SelectItem value="spread_asc">Menor spread</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-slate-400 mb-2 block">Banda de relevância</label>
+                <Select value={relevanceBand} onValueChange={(v: any) => setRelevanceBand(v)}>
+                  <SelectTrigger className="bg-fin-surface1 border-white/10 text-slate-200 w-full md:w-64">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas (68%, 95%, 99%)</SelectItem>
+                    <SelectItem value="68">Somente 68%</SelectItem>
+                    <SelectItem value="95">Somente 95%</SelectItem>
+                    <SelectItem value="99">Somente 99%</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-4">
+                {[
+                  { key: 'a1', label: `Preço ${stock1Symbol}` },
+                  { key: 'a2', label: `Preço ${stock2Symbol}` },
+                  { key: 'spread', label: 'Spread' },
+                  { key: 'z', label: 'Z-Score' },
+                ].map(col => (
+                  <label key={col.key} className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer hover:text-slate-200 transition-colors">
+                    <input
+                      type="checkbox"
+                      className="checkbox-dark"
+                      checked={showCols[col.key as keyof typeof showCols]}
+                      onChange={e => setShowCols(s => ({ ...s, [col.key]: e.target.checked }))}
+                    />
+                    {col.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Z-Score Ranges */}
+            <div className="glass rounded-2xl p-6 border border-white/5">
+              <h3 className="text-sm font-bold text-white mb-5 flex items-center gap-2">
+                <Layers className="w-4 h-4 text-amber-400" /> Faixas de Z-Score (σ) e Sinais
+              </h3>
+              <label className="text-xs text-slate-400 mb-2 block">Faixas (formato: min..max; min..max)</label>
+              <div className="flex gap-2">
+                <input
+                  className="input-dark flex-1"
+                  placeholder="-3..-1; -1..1; 1..3"
+                  value={zRangeText}
+                  onChange={e => setZRangeText(e.target.value)}
+                />
                 <button
-                  onClick={() => setBrapiToken('')}
-                  className="px-3 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-semibold transition-all border border-red-500/20 animate-fade-in"
+                  onClick={() => {
+                    const parts = zRangeText.split(';').map(s => s.trim()).filter(Boolean);
+                    const parsed: Array<{ min: number; max: number; signal: RangeSignal }> = [];
+                    for (const p of parts) {
+                      const [a, b] = p.split('..').map(s => Number(s.trim()));
+                      if (!isNaN(a) && !isNaN(b)) parsed.push({ min: Math.min(a, b), max: Math.max(a, b), signal: 'NEUTRO' });
+                    }
+                    setZRanges(parsed);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 text-sm font-medium transition-all border border-cyan-500/30 hover:border-cyan-500/50 whitespace-nowrap"
                 >
-                  Limpar
+                  Aplicar
                 </button>
-              )}
-            </div>
-            <p className="text-[10px] text-slate-500 mt-2">
-              Crie uma conta em <a href="https://brapi.dev" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">brapi.dev</a> para obter um token de acesso instantâneo.
-            </p>
-          </div>
-
-          {/* Update + Period */}
-          <div className="glass rounded-2xl p-6 border border-white/5">
-            <h3 className="text-sm font-bold text-white mb-5 flex items-center gap-2">
-              <Clock className="w-4 h-4 text-cyan-400" /> Tempo & Período
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="text-xs text-slate-400 mb-2 block">Atualização</label>
-                <Select value={updateInterval.toString()} onValueChange={v => setUpdateInterval(Number(v))}>
-                  <SelectTrigger className="bg-fin-surface1 border-white/10 text-slate-200">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={APP_CONFIG.TIMING.UPDATE_INTERVALS.FAST.toString()}>30s</SelectItem>
-                    <SelectItem value={APP_CONFIG.TIMING.UPDATE_INTERVALS.REALTIME.toString()}>60s</SelectItem>
-                    <SelectItem value={APP_CONFIG.TIMING.UPDATE_INTERVALS.MEDIUM.toString()}>2min</SelectItem>
-                    <SelectItem value={APP_CONFIG.TIMING.UPDATE_INTERVALS.SLOW.toString()}>5min</SelectItem>
-                    <SelectItem value={APP_CONFIG.TIMING.UPDATE_INTERVALS.HOURLY.toString()}>1h</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-xs text-slate-400 mb-2 block">Período Histórico</label>
-                <Select value={historyDays.toString()} onValueChange={v => setHistoryDays(Number(v))}>
-                  <SelectTrigger className="bg-fin-surface1 border-white/10 text-slate-200">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[30, 60, 90, 120, 150].map(d => <SelectItem key={d} value={d.toString()}>{d} dias</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-xs text-slate-400 mb-2 block">Bins Histograma</label>
-                <Select value={histBins.toString()} onValueChange={v => setHistBins(Number(v))}>
-                  <SelectTrigger className="bg-fin-surface1 border-white/10 text-slate-200">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[10, 20, 30, 40].map(b => <SelectItem key={b} value={b.toString()}>{b} bins</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-
-          {/* Occurrences settings */}
-          <div className="glass rounded-2xl p-6 border border-white/5">
-            <h3 className="text-sm font-bold text-white mb-5 flex items-center gap-2">
-              <Target className="w-4 h-4 text-violet-400" /> Ocorrências
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <div>
-                <label className="text-xs text-slate-400 mb-2 block">Limite</label>
-                <Select value={occLimit.toString()} onValueChange={v => setOccLimit(Number(v))}>
-                  <SelectTrigger className="bg-fin-surface1 border-white/10 text-slate-200">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[10, 20, 50, 100].map(n => <SelectItem key={n} value={n.toString()}>{n}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-xs text-slate-400 mb-2 block">Ordenação</label>
-                <Select value={occSort} onValueChange={(v: any) => setOccSort(v)}>
-                  <SelectTrigger className="bg-fin-surface1 border-white/10 text-slate-200">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="recent">Mais recentes</SelectItem>
-                    <SelectItem value="spread_desc">Maior spread</SelectItem>
-                    <SelectItem value="spread_asc">Menor spread</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div>
-              <label className="text-xs text-slate-400 mb-2 block">Banda de relevância</label>
-              <Select value={relevanceBand} onValueChange={(v: any) => setRelevanceBand(v)}>
-                <SelectTrigger className="bg-fin-surface1 border-white/10 text-slate-200 w-full md:w-64">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas (68%, 95%, 99%)</SelectItem>
-                  <SelectItem value="68">Somente 68%</SelectItem>
-                  <SelectItem value="95">Somente 95%</SelectItem>
-                  <SelectItem value="99">Somente 99%</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="mt-4 flex flex-wrap gap-4">
-              {[
-                { key: 'a1', label: `Preço ${stock1Symbol}` },
-                { key: 'a2', label: `Preço ${stock2Symbol}` },
-                { key: 'spread', label: 'Spread' },
-                { key: 'z', label: 'Z-Score' },
-              ].map(col => (
-                <label key={col.key} className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer hover:text-slate-200 transition-colors">
-                  <input
-                    type="checkbox"
-                    className="checkbox-dark"
-                    checked={showCols[col.key as keyof typeof showCols]}
-                    onChange={e => setShowCols(s => ({ ...s, [col.key]: e.target.checked }))}
-                  />
-                  {col.label}
-                </label>
-              ))}
             </div>
           </div>
 
@@ -1826,8 +1868,19 @@ function StockPairAnalyzer() {
               </div>
             )}
           </div>
+
+          {/* Footer do Modal */}
+          <div className="flex justify-end pt-4 border-t border-white/10">
+            <button
+              onClick={() => setShowSettingsModal(false)}
+              className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-violet-500 text-slate-950 font-bold text-sm hover:opacity-90 transition-all shadow-lg shadow-cyan-500/20"
+            >
+              Salvar & Fechar
+            </button>
+          </div>
         </div>
-      )}
+      </div>
+    )}
 
       {/* ════════════════════════════════════
           TAB: BACKTEST (D — Gráfico Z-Score com bandas + C — P&L simulado)
@@ -1953,13 +2006,23 @@ function StockPairAnalyzer() {
               )}
             </>
           )}
+
+          <div className="flex justify-end">
+            <button
+              onClick={() => setActiveTab('watchlist')}
+              className="px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-violet-500 text-slate-950 font-bold text-sm hover:opacity-90 transition-all shadow-lg shadow-cyan-500/20 flex items-center gap-2"
+            >
+              <span>Próxima Etapa: Watchlist & Histórico</span>
+              <span>→</span>
+            </button>
+          </div>
         </div>
       )}
 
       {/* ════════════════════════════════════
-          TAB: FERRAMENTAS — Calculadora de Sizing & Stop Loss (A + B)
+          ETAPA 04: CALCULADORA & GESTÃO DE RISCO ('calculadora')
       ════════════════════════════════════ */}
-      {activeTab === 'ferramentas' && (
+      {(activeTab === 'calculadora' || (activeTab as any) === 'ferramentas') && (
         <div className="space-y-6 animate-fade-in">
           <div className="glass rounded-2xl p-6 border border-cyan-500/30 bg-gradient-to-br from-cyan-500/5 via-transparent to-violet-500/5">
             <h2 className="text-base font-bold text-white mb-1 flex items-center gap-2">
@@ -1969,32 +2032,37 @@ function StockPairAnalyzer() {
             <p className="text-xs text-slate-400 mb-5">
               Baseado no capital disponível, Z-Score atual, ATR e Beta do par, calcula tamanho de posição e níveis de proteção.
             </p>
-
-            {/* Input de Capital */}
-            <div className="flex flex-wrap gap-4 items-end mb-6">
+            <div className="flex flex-wrap gap-6 mb-6 items-end">
               <div>
                 <label className="text-xs text-slate-400 block mb-1.5">Capital Disponível (R$)</label>
                 <input
-                  type="number" min="1000" step="1000"
+                  type="number" step="1000" min="1000"
                   value={capitalReais}
                   onChange={e => setCapitalReais(Number(e.target.value))}
-                  className="input-dark w-40 font-mono"
+                  className="input-dark w-36 font-mono font-bold text-white"
                 />
               </div>
-              <button
-                onClick={handleCalculateSizing}
-                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-violet-500 text-slate-950 text-sm font-bold hover:opacity-90 transition-all shadow-lg shadow-cyan-500/20 flex items-center gap-2"
-              >
-                <Calculator className="w-4 h-4" />
-                Calcular
-              </button>
+              <div>
+                <label className="text-xs text-slate-400 block mb-1.5">Alavancagem Máxima</label>
+                <Select value={leverage.toString()} onValueChange={v => setLeverage(Number(v))}>
+                  <SelectTrigger className="w-28 bg-fin-surface1 border-white/10 text-slate-200">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1.0×</SelectItem>
+                    <SelectItem value="1.5">1.5×</SelectItem>
+                    <SelectItem value="2">2.0×</SelectItem>
+                    <SelectItem value="3">3.0×</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             {stopLossResult && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Sizing */}
+                {/* Sizing Card */}
                 <div className="bg-white/5 rounded-xl border border-white/10 p-4 space-y-3">
-                  <h3 className="text-xs font-bold text-cyan-400 uppercase tracking-wider">📦 Sizing da Posição</h3>
+                  <h3 className="text-xs font-bold text-cyan-400 uppercase tracking-wider">📦 Sizing Beta-Neutro (Long & Short)</h3>
                   <div className="flex justify-between items-center py-1.5 border-b border-white/5">
                     <span className="text-xs text-slate-400">{stock1Symbol} (LONG)</span>
                     <span className="font-mono font-bold text-emerald-400">{stopLossResult.qty1} ações</span>
@@ -2060,6 +2128,16 @@ function StockPairAnalyzer() {
               </div>
             )}
           </div>
+          
+          <div className="flex justify-end">
+            <button
+              onClick={() => setActiveTab('backtest')}
+              className="px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-violet-500 text-slate-950 font-bold text-sm hover:opacity-90 transition-all shadow-lg shadow-cyan-500/20 flex items-center gap-2"
+            >
+              <span>Próxima Etapa: Backtest & Simulação</span>
+              <span>→</span>
+            </button>
+          </div>
         </div>
       )}
 
@@ -2081,7 +2159,7 @@ function StockPairAnalyzer() {
               return (
                 <button
                   key={`${s1}-${s2}`}
-                  onClick={() => { setStock1Symbol(s1); setStock2Symbol(s2); setActiveTab('resumo'); }}
+                  onClick={() => { setStock1Symbol(s1); setStock2Symbol(s2); setActiveTab('diagnostico'); }}
                   className={`text-left p-4 rounded-2xl border transition-all hover:scale-[1.02] ${
                     isActive
                       ? 'glass border-cyan-500/50 shadow-glow-cyan bg-cyan-500/10'
@@ -2136,9 +2214,9 @@ function StockPairAnalyzer() {
       )}
 
       {/* ════════════════════════════════════
-          TAB: HISTÓRICO DE SINAIS (H)
+          ETAPA 06 parte 2: HISTÓRICO DE SINAIS
       ════════════════════════════════════ */}
-      {activeTab === 'historico' && (
+      {(activeTab === 'watchlist' || (activeTab as any) === 'historico') && (
         <div className="space-y-4 animate-fade-in">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <h2 className="text-base font-bold text-white flex items-center gap-2">
