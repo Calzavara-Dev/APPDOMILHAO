@@ -465,14 +465,59 @@ function StockPairAnalyzer() {
   const [backtestResult, setBacktestResult] = useState<BacktestResult | null>(null);
 
   // ── Watchlist ──
-  const WATCHLIST_PAIRS: [string, string][] = [
+  const DEFAULT_WATCHLIST: [string, string][] = useMemo(() => [
     ['PETR3', 'PETR4'],
     ['VALE3', 'PETR4'],
     ['ITUB4', 'BBDC4'],
     ['ABEV3', 'BRFS3'],
     ['WEGE3', 'EGIE3'],
     ['MGLU3', 'VIIA3'],
-  ];
+  ], []);
+
+  const [watchlistPairs, setWatchlistPairs] = useState<[string, string][]>([
+    ['PETR3', 'PETR4'],
+    ['VALE3', 'PETR4'],
+    ['ITUB4', 'BBDC4'],
+    ['ABEV3', 'BRFS3'],
+    ['WEGE3', 'EGIE3'],
+    ['MGLU3', 'VIIA3'],
+  ]);
+  const [newWatchlistPair1, setNewWatchlistPair1] = useState<string>('');
+  const [newWatchlistPair2, setNewWatchlistPair2] = useState<string>('');
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('fin_watchlist_pairs');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setWatchlistPairs(parsed);
+        }
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('fin_watchlist_pairs', JSON.stringify(watchlistPairs));
+    } catch {}
+  }, [watchlistPairs]);
+
+  const handleAddWatchlistPair = () => {
+    const s1 = newWatchlistPair1.trim().toUpperCase();
+    const s2 = newWatchlistPair2.trim().toUpperCase();
+    if (!s1 || !s2 || s1 === s2) return;
+    const exists = watchlistPairs.some(([a, b]) => (a === s1 && b === s2) || (a === s2 && b === s1));
+    if (!exists) {
+      setWatchlistPairs(prev => [[s1, s2], ...prev]);
+    }
+    setNewWatchlistPair1('');
+    setNewWatchlistPair2('');
+  };
+
+  const handleRemoveWatchlistPair = (s1: string, s2: string) => {
+    setWatchlistPairs(prev => prev.filter(([a, b]) => !(a === s1 && b === s2)));
+  };
 
 
   const pairStats: PairStats = useMemo(() => {
@@ -1869,6 +1914,69 @@ function StockPairAnalyzer() {
             )}
           </div>
 
+          {/* Gerenciar Watchlist */}
+          <div className="glass rounded-2xl p-6 border border-white/5 space-y-4">
+            <h3 className="text-sm font-bold text-white flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <Search className="w-4 h-4 text-cyan-400" /> Watchlist de Pares Monitorados ({watchlistPairs.length})
+              </span>
+              {watchlistPairs.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setWatchlistPairs(DEFAULT_WATCHLIST)}
+                  className="text-xs text-slate-400 hover:text-slate-200 underline font-normal"
+                >
+                  Restaurar Padrão
+                </button>
+              )}
+            </h3>
+            <div className="flex flex-wrap gap-2 items-center">
+              <input
+                type="text"
+                placeholder="Ativo 1 (ex: PETR4)"
+                value={newWatchlistPair1}
+                onChange={e => setNewWatchlistPair1(e.target.value)}
+                className="input-dark w-36 font-mono text-xs uppercase"
+              />
+              <span className="text-slate-500 text-xs font-bold">vs</span>
+              <input
+                type="text"
+                placeholder="Ativo 2 (ex: PRIO3)"
+                value={newWatchlistPair2}
+                onChange={e => setNewWatchlistPair2(e.target.value)}
+                className="input-dark w-36 font-mono text-xs uppercase"
+              />
+              <button
+                type="button"
+                onClick={handleAddWatchlistPair}
+                disabled={!newWatchlistPair1.trim() || !newWatchlistPair2.trim()}
+                className="px-4 py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 font-bold text-xs border border-cyan-500/30 transition-all disabled:opacity-40"
+              >
+                + Adicionar Par
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2 pt-2">
+              {watchlistPairs.map(([s1, s2]) => (
+                <div
+                  key={`${s1}-${s2}`}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-xs font-mono"
+                >
+                  <span className="text-cyan-400 font-bold">{s1}</span>
+                  <span className="text-slate-500">×</span>
+                  <span className="text-violet-400 font-bold">{s2}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveWatchlistPair(s1, s2)}
+                    className="ml-1 text-red-400 hover:text-red-200 font-bold"
+                    title="Remover"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Footer do Modal */}
           <div className="flex justify-end pt-4 border-t border-white/10">
             <button
@@ -2146,21 +2254,65 @@ function StockPairAnalyzer() {
       ════════════════════════════════════ */}
       {activeTab === 'watchlist' && (
         <div className="animate-fade-in space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <h2 className="text-base font-bold text-white flex items-center gap-2">
               <Search className="w-5 h-5 text-cyan-400" />
               Watchlist de Pares — Monitoramento Simultâneo
             </h2>
-            <span className="text-xs text-slate-400">{WATCHLIST_PAIRS.length} pares monitorados</span>
+            <span className="text-xs text-slate-400">{watchlistPairs.length} pares monitorados</span>
           </div>
+
+          {/* Barra para Adicionar Novo Par e Restaurar */}
+          <div className="glass rounded-2xl p-4 border border-white/10 flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider">➕ Adicionar Par à Watchlist:</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 flex-1 max-w-xl">
+              <input
+                type="text"
+                placeholder="Ativo 1 (ex: PETR4)"
+                value={newWatchlistPair1}
+                onChange={e => setNewWatchlistPair1(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleAddWatchlistPair()}
+                className="input-dark w-36 font-mono text-xs uppercase"
+              />
+              <span className="text-slate-500 text-xs font-bold">vs</span>
+              <input
+                type="text"
+                placeholder="Ativo 2 (ex: PRIO3)"
+                value={newWatchlistPair2}
+                onChange={e => setNewWatchlistPair2(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleAddWatchlistPair()}
+                className="input-dark w-36 font-mono text-xs uppercase"
+              />
+              <button
+                type="button"
+                onClick={handleAddWatchlistPair}
+                disabled={!newWatchlistPair1.trim() || !newWatchlistPair2.trim()}
+                className="px-4 py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 font-bold text-xs border border-cyan-500/30 transition-all disabled:opacity-40 cursor-pointer"
+              >
+                + Adicionar Par
+              </button>
+            </div>
+            {watchlistPairs.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setWatchlistPairs(DEFAULT_WATCHLIST)}
+                className="text-xs text-slate-400 hover:text-slate-200 underline transition-colors cursor-pointer"
+              >
+                Restaurar Padrão ({DEFAULT_WATCHLIST.length})
+              </button>
+            )}
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {WATCHLIST_PAIRS.map(([s1, s2]) => {
+            {watchlistPairs.map(([s1, s2]) => {
               const isActive = s1 === stock1Symbol && s2 === stock2Symbol;
               return (
-                <button
+                <div
                   key={`${s1}-${s2}`}
                   onClick={() => { setStock1Symbol(s1); setStock2Symbol(s2); setActiveTab('diagnostico'); }}
-                  className={`text-left p-4 rounded-2xl border transition-all hover:scale-[1.02] ${
+                  className={`text-left p-4 rounded-2xl border transition-all hover:scale-[1.02] cursor-pointer ${
                     isActive
                       ? 'glass border-cyan-500/50 shadow-glow-cyan bg-cyan-500/10'
                       : 'glass border-white/10 hover:border-white/20'
@@ -2172,9 +2324,22 @@ function StockPairAnalyzer() {
                       <span className="text-slate-600 text-xs">vs</span>
                       <span className="font-mono font-bold text-violet-400 text-sm">{s2}</span>
                     </div>
-                    {isActive && (
-                      <span className="text-[10px] bg-cyan-500 text-slate-950 font-black px-1.5 py-0.5 rounded uppercase">ATIVO</span>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {isActive && (
+                        <span className="text-[10px] bg-cyan-500 text-slate-950 font-black px-1.5 py-0.5 rounded uppercase">ATIVO</span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveWatchlistPair(s1, s2);
+                        }}
+                        className="w-6 h-6 rounded-lg bg-red-500/10 hover:bg-red-500/30 text-red-400 hover:text-red-200 flex items-center justify-center transition-all border border-red-500/20"
+                        title="Remover par da watchlist"
+                      >
+                        ✕
+                      </button>
+                    </div>
                   </div>
                   {isActive && (
                     <div className="space-y-1">
@@ -2206,7 +2371,7 @@ function StockPairAnalyzer() {
                       Clique para analisar este par →
                     </div>
                   )}
-                </button>
+                </div>
               );
             })}
           </div>
