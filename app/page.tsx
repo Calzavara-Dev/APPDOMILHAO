@@ -34,6 +34,8 @@ import { saveSignal, loadSignals, clearSignals, type SignalRecord } from "@/lib/
 import {
   getNotifPermission, requestPermission, checkAndNotify, type NotifPermission
 } from "@/lib/pushNotification";
+import { ZScoreThermometer } from "@/components/ZScoreThermometer";
+
 
 // ─────────────────────────────────────────
 // TYPES
@@ -1269,6 +1271,17 @@ function StockPairAnalyzer() {
           </button>
         </div>
       </div>
+
+      {/* ════════════════════════════════════
+          TERMÔMETRO DIDÁTICO DO Z-SCORE
+      ════════════════════════════════════ */}
+      <ZScoreThermometer
+        zScore={latestZScore}
+        stock1Symbol={stock1Symbol}
+        stock2Symbol={stock2Symbol}
+        halfLifeDays={pairStats.halfLifeDays}
+        spreadValue={latestSpread}
+      />
 
       {/* ════════════════════════════════════
           KPI CARDS
