@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import APP_CONFIG from "@/config/app-config";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import {
@@ -21,8 +21,10 @@ import { Button } from "@/components/ui/button";
 import {
   Settings, TrendingUp, TrendingDown, Activity,
   BarChart2, Clock, Layers, Eye, EyeOff,
-  ChevronRight, Zap, Target, Radio
+  ChevronRight, Zap, Target, Radio,
+  Share2, Copy, Check, FileText, Compass, Award, ShieldAlert, ShieldCheck
 } from "lucide-react";
+import { calculatePairStats, generateOperationalReport, type PairStats } from "@/lib/quantMetrics";
 
 // ─────────────────────────────────────────
 // TYPES
@@ -191,6 +193,8 @@ export type CamadaSpread = {
   avgPrice2: number;
   rotulo: string;
   sugestao: string;
+  zScoreCamada: number;
+  potencialRetornoPct: number;
 };
 
 export type ResultadoBandasCamadas = {
@@ -253,6 +257,12 @@ const calculateBandasCamadas = (
     spreadMax = parseFloat((spreadMin + 1).toFixed(2));
   }
 
+  const spreadsList = spreadData.map(d => d.spread);
+  const meanSpread = spreadsList.reduce((a, b) => a + b, 0) / (spreadsList.length || 1);
+  const stdDevSpread = Math.sqrt(
+    spreadsList.map(x => Math.pow(x - meanSpread, 2)).reduce((a, b) => a + b, 0) / (spreadsList.length || 1)
+  );
+
   const step = parseFloat(((spreadMax - spreadMin) / numCamadas).toFixed(2));
   const camadas: CamadaSpread[] = [];
   let countNaFaixa = 0;
@@ -260,6 +270,7 @@ const calculateBandasCamadas = (
   for (let i = 0; i < numCamadas; i++) {
     const cMin = parseFloat((spreadMin + i * step).toFixed(2));
     const cMax = parseFloat((i === numCamadas - 1 ? spreadMax : spreadMin + (i + 1) * step).toFixed(2));
+    const cCenter = parseFloat(((cMin + cMax) / 2).toFixed(2));
 
     let matchingIndices: number[] = [];
     for (let idx = 0; idx < spreadData.length; idx++) {
@@ -282,6 +293,9 @@ const calculateBandasCamadas = (
     const avgPrice1 = count > 0 ? parseFloat((sum1 / count).toFixed(2)) : 0;
     const avgPrice2 = count > 0 ? parseFloat((sum2 / count).toFixed(2)) : 0;
 
+    const zScoreCamada = stdDevSpread > 0 ? parseFloat(((cCenter - meanSpread) / stdDevSpread).toFixed(2)) : 0;
+    const potencialRetornoPct = cCenter > 0 ? parseFloat(((Math.abs(cCenter - meanSpread) / cCenter) * 100).toFixed(2)) : 0;
+
     let sugestao = "🟡 Spread Central / Equilíbrio";
     if (i < numCamadas / 3) {
       sugestao = "🟢 Spread Baixo — Compra Ação 1";
@@ -299,6 +313,8 @@ const calculateBandasCamadas = (
       avgPrice2,
       rotulo: `R$ ${cMin.toFixed(2)} — R$ ${cMax.toFixed(2)}`,
       sugestao,
+      zScoreCamada,
+      potencialRetornoPct,
     });
   }
 
@@ -411,6 +427,27 @@ function StockPairAnalyzer() {
   const [liveChange1, setLiveChange1] = useState<number | null>(null);
   const [liveChange2, setLiveChange2] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>('resumo');
+  const [copiedReport, setCopiedReport] = useState<boolean>(false);
+
+  const pairStats: PairStats = useMemo(() => {
+    return calculatePairStats(stock1Data, stock2Data, spreadData);
+  }, [stock1Data, stock2Data, spreadData]);
+
+  const handleCopyReport = () => {
+    const reportText = generateOperationalReport(
+      stock1Symbol,
+      stock2Symbol,
+      latestSpread,
+      latestZScore,
+      signal,
+      pairStats,
+      resultadoCamadas,
+      bandaFreqPercent
+    );
+    navigator.clipboard.writeText(reportText);
+    setCopiedReport(true);
+    setTimeout(() => setCopiedReport(false), 3000);
+  };
 
   useEffect(() => { try { localStorage.setItem('ui_active_tab', activeTab); } catch { } }, [activeTab]);
 
@@ -808,6 +845,8 @@ function StockPairAnalyzer() {
                   <th className="py-3 px-3">Camada</th>
                   <th className="py-3 px-3">Faixa de Spread</th>
                   <th className="py-3 px-3">Frequência</th>
+                  <th className="py-3 px-3">Z-Score</th>
+                  <th className="py-3 px-3">Retorno à Média</th>
                   <th className="py-3 px-3">Preço Méd. {stock1Symbol}</th>
                   <th className="py-3 px-3">Preço Méd. {stock2Symbol}</th>
                   <th className="py-3 px-3">Sugestão / Leitura</th>
@@ -857,6 +896,12 @@ function StockPairAnalyzer() {
                           <span className="text-xs text-slate-400">({camada.percent}%)</span>
                         </div>
                       </td>
+                      <td className="py-3 px-3 font-bold text-slate-300">
+                        {camada.zScoreCamada >= 0 ? '+' : ''}{camada.zScoreCamada} σ
+                      </td>
+                      <td className="py-3 px-3 font-bold text-cyan-400">
+                        {camada.potencialRetornoPct > 0 ? `~${camada.potencialRetornoPct}%` : 'Na Média'}
+                      </td>
                       <td className="py-3 px-3 text-emerald-400 font-bold">R$ {camada.avgPrice1.toFixed(2)}</td>
                       <td className="py-3 px-3 text-violet-400 font-bold">R$ {camada.avgPrice2.toFixed(2)}</td>
                       <td className="py-3 px-3 text-xs font-sans">
@@ -873,6 +918,46 @@ function StockPairAnalyzer() {
                 })}
               </tbody>
             </table>
+          </div>
+        </div>
+
+        {/* Card Estatístico de Cointegração e Giro Operacional */}
+        <div className="glass rounded-2xl p-6 border border-cyan-500/30 bg-gradient-to-br from-cyan-500/5 via-transparent to-violet-500/5">
+          <h3 className="text-base font-bold text-white mb-2 flex items-center gap-2">
+            <Award className="w-5 h-5 text-cyan-400" />
+            Análise de Cointegração & Estabilidade Operacional do Par
+          </h3>
+          <p className="text-xs text-slate-400 mb-4">
+            Estatísticas calculadas a partir de {spreadData.length} períodos para avaliar a segurança da operação Long & Short:
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-white/5 p-4 rounded-xl border border-white/10">
+              <span className="text-xs text-slate-400 block font-semibold uppercase">Correlação de Pearson</span>
+              <div className="text-2xl font-black font-mono text-cyan-400 mt-1">
+                {(pairStats.correlation * 100).toFixed(0)}% <span className="text-xs text-slate-400 font-normal">(R² = {pairStats.rSquared})</span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1.5">
+                {pairStats.correlation >= 0.7 ? 'Excelente alinhamento direcional entre os ativos.' : 'Atenção: correlação moderada ou baixa.'}
+              </p>
+            </div>
+            <div className="bg-white/5 p-4 rounded-xl border border-white/10">
+              <span className="text-xs text-slate-400 block font-semibold uppercase">Beta Relativo do Par</span>
+              <div className="text-2xl font-black font-mono text-white mt-1">
+                {pairStats.beta}
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1.5">
+                Razão ótima de quantidade (financeiro) para balanceamento do hedge Long & Short.
+              </p>
+            </div>
+            <div className="bg-white/5 p-4 rounded-xl border border-white/10">
+              <span className="text-xs text-slate-400 block font-semibold uppercase">Meia-Vida (Half-Life)</span>
+              <div className="text-2xl font-black font-mono text-violet-400 mt-1">
+                ~{pairStats.halfLifeDays} períodos
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1.5">
+                Tempo estimado para o spread retornar do extremo até o centro da curva Gaussiana.
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -981,25 +1066,93 @@ function StockPairAnalyzer() {
       </header>
 
       {/* ════════════════════════════════════
+          FAROL OPERACIONAL & ACTIONABLE INSIGHTS
+      ════════════════════════════════════ */}
+      <div className="mb-6 p-4 md:p-5 rounded-2xl glass border border-white/10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
+            latestZScore <= -1.5 || signal === 'LONG'
+              ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-400'
+              : latestZScore >= 1.5 || signal === 'SHORT'
+              ? 'bg-rose-500/20 border border-rose-500/40 text-rose-400'
+              : 'bg-cyan-500/20 border border-cyan-500/40 text-cyan-400'
+          }`}>
+            {latestZScore <= -1.5 || signal === 'LONG' ? (
+              <TrendingUp className="w-6 h-6 animate-pulse" />
+            ) : latestZScore >= 1.5 || signal === 'SHORT' ? (
+              <TrendingDown className="w-6 h-6 animate-pulse" />
+            ) : (
+              <Compass className="w-6 h-6" />
+            )}
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Farol Quantitativo</span>
+              <span className={`px-2 py-0.5 rounded-full text-[11px] font-extrabold uppercase tracking-wide border ${
+                latestZScore <= -1.5 || signal === 'LONG'
+                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                  : latestZScore >= 1.5 || signal === 'SHORT'
+                  ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                  : 'bg-slate-500/20 text-slate-300 border-slate-500/40'
+              }`}>
+                {latestZScore <= -1.5 || signal === 'LONG'
+                  ? '🟢 Sinal de Compra do Spread'
+                  : latestZScore >= 1.5 || signal === 'SHORT'
+                  ? '🔴 Sinal de Venda do Spread'
+                  : '⚪ Equilíbrio Gaussiano / Neutro'}
+              </span>
+            </div>
+            <p className="text-sm font-semibold text-white mt-1">
+              {latestZScore <= -1.5 || signal === 'LONG'
+                ? `Spread sobrevendido (Z: ${latestZScore.toFixed(2)} σ). Alta probabilidade de retorno à média.`
+                : latestZScore >= 1.5 || signal === 'SHORT'
+                ? `Spread sobrecomprado (Z: +${latestZScore.toFixed(2)} σ). Oportunidade de compressão de par.`
+                : `Spread dentro da faixa normal de frequência (${bandaFreqPercent}%). Operação na média.`}
+            </p>
+          </div>
+        </div>
+
+        {/* Botões de Ação Rápida */}
+        <div className="flex items-center gap-2.5 w-full md:w-auto">
+          <button
+            onClick={handleCopyReport}
+            className="flex-1 md:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-cyan-500 to-violet-500 text-slate-950 hover:opacity-90 transition-all shadow-lg shadow-cyan-500/20"
+          >
+            {copiedReport ? (
+              <>
+                <Check className="w-4 h-4" />
+                <span>Estudo Copiado!</span>
+              </>
+            ) : (
+              <>
+                <Share2 className="w-4 h-4" />
+                <span>Copiar Estudo (WhatsApp)</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* ════════════════════════════════════
           KPI CARDS
       ════════════════════════════════════ */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {/* Signal */}
         <div className="kpi-card animate-fade-in-up col-span-2 lg:col-span-1" style={{ borderColor: sc.border, background: sc.bg }}>
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Sinal</span>
+            <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Sinal Z-Score</span>
             <sc.Icon className={`w-4 h-4 ${sc.cls} animate-pulse-glow`} />
           </div>
           <div className={`text-3xl font-black tracking-tight ${sc.cls}`}>{sc.label}</div>
           <div className="mt-2 text-xs text-slate-500">
-            Z-Score: <span className="text-slate-300 font-mono font-semibold">{latestZScore.toFixed(3)}</span>
+            Desvio Padrão: <span className="text-slate-300 font-mono font-semibold">{latestZScore.toFixed(2)} σ</span>
           </div>
         </div>
 
         {/* Spread atual */}
         <div className="kpi-card animate-fade-in-up delay-100">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Spread</span>
+            <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Spread Atual</span>
             <Radio className="w-4 h-4 text-cyan-400" />
           </div>
           <div className={`text-2xl font-black font-mono ${latestSpread >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
@@ -1010,45 +1163,31 @@ function StockPairAnalyzer() {
           </div>
         </div>
 
-        {/* Ação 1 */}
-        <div className="kpi-card animate-fade-in-up delay-200">
+        {/* Correlação do Par */}
+        <div className="kpi-card animate-fade-in-up delay-200 border border-cyan-500/20">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-mono font-bold text-cyan-400">{stock1Symbol}</span>
-            <span className="text-xs text-slate-500">{getStockName(stock1Symbol).split(' ')[0]}</span>
+            <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider">Correlação do Par</span>
+            <Award className="w-4 h-4 text-cyan-400" />
           </div>
-          <div className="text-2xl font-black font-mono" style={{ color: livePrice1 ? '#06b6d4' : '#94a3b8' }}>
-            R$ {(livePrice1 ?? getLatestPrice(stock1Data)).toFixed(2)}
+          <div className="text-2xl font-black font-mono text-white">
+            {(pairStats.correlation * 100).toFixed(0)}%
           </div>
-          <div className="mt-2 flex items-center gap-2 text-xs">
-            {liveChange1 !== null ? (
-              <span className={`font-semibold ${liveChange1 >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                {liveChange1 >= 0 ? '+' : ''}{liveChange1.toFixed(2)}%
-              </span>
-            ) : (
-              <span className="text-slate-500">{historyDays}d · {histBins} bins</span>
-            )}
+          <div className="mt-2 text-xs text-slate-500">
+            R²: <span className="text-cyan-300 font-mono">{pairStats.rSquared}</span> · Beta: <span className="text-cyan-300 font-mono">{pairStats.beta}</span>
           </div>
         </div>
 
-        {/* Ação 2 */}
-        <div className="kpi-card animate-fade-in-up delay-300">
+        {/* Meia-Vida (Retorno à Média) */}
+        <div className="kpi-card animate-fade-in-up delay-300 border border-violet-500/20">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-mono font-bold text-violet-400">{stock2Symbol}</span>
-            <span className="text-xs text-slate-500">{getStockName(stock2Symbol).split(' ')[0]}</span>
+            <span className="text-xs font-bold text-violet-400 uppercase tracking-wider">Meia-Vida (Half-Life)</span>
+            <Clock className="w-4 h-4 text-violet-400" />
           </div>
-          <div className="text-2xl font-black font-mono" style={{ color: livePrice2 ? '#8b5cf6' : '#94a3b8' }}>
-            R$ {(livePrice2 ?? getLatestPrice(stock2Data)).toFixed(2)}
+          <div className="text-2xl font-black font-mono text-white">
+            ~{pairStats.halfLifeDays} <span className="text-sm font-normal text-slate-400">dias</span>
           </div>
-          <div className="mt-2 flex items-center gap-2 text-xs">
-            {liveChange2 !== null ? (
-              <span className={`font-semibold ${liveChange2 >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                {liveChange2 >= 0 ? '+' : ''}{liveChange2.toFixed(2)}%
-              </span>
-            ) : (
-              <span className="flex gap-3">
-                <button onClick={() => setActiveTab('estatisticas')} className="text-violet-400 hover:text-violet-300 transition-colors">Stats</button>
-              </span>
-            )}
+          <div className="mt-2 text-xs text-slate-500">
+            Tempo est. de reversão à média
           </div>
         </div>
       </div>
