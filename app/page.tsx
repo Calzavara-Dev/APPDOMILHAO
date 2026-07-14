@@ -638,10 +638,14 @@ function StockPairAnalyzer() {
         const cached = cacheRef.current[cacheKey];
         if (cached && now - cached.ts < cacheTTL) return cached.data;
 
-        // Mapear período histórico para range da brapi (limite de 3mo da API)
+        // Mapear período histórico para range da brapi (suporta 1 ano e além)
         const getRange = (days: number) => {
           if (days <= 22) return '1mo';
-          return '3mo';
+          if (days <= 66) return '3mo';
+          if (days <= 130) return '6mo';
+          if (days <= 260) return '1y';
+          if (days <= 520) return '2y';
+          return '5y';
         };
 
         const url = `https://brapi.dev/api/quote/${symbol}?range=${getRange(historyDays)}&interval=1d&fundamental=false${
@@ -1734,7 +1738,11 @@ function StockPairAnalyzer() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {[30, 60, 90, 120, 150].map(d => <SelectItem key={d} value={d.toString()}>{d} dias</SelectItem>)}
+                      {[30, 60, 90, 120, 150, 180, 252, 365].map(d => (
+                        <SelectItem key={d} value={d.toString()}>
+                          {d === 252 ? '252 dias (1 ano pregões)' : d === 365 ? '365 dias (1 ano)' : `${d} dias`}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

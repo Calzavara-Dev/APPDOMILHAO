@@ -13,7 +13,7 @@ export const APP_CONFIG = {
 
     // Período de análise histórica
     HISTORICAL_PERIOD: {
-      DAYS: 60,                // Quantos dias de histórico analisar (3 meses B3)
+      DAYS: 252,               // Quantos dias de histórico analisar (1 ano útil B3 ~ 252 pregões)
       MIN_DAYS: 30,            // Mínimo de dias necessários
     },
 
