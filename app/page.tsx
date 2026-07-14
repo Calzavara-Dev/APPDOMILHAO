@@ -648,14 +648,33 @@ function StockPairAnalyzer() {
           return '5y';
         };
 
-        const url = `https://brapi.dev/api/quote/${symbol}?range=${getRange(historyDays)}&interval=1d&fundamental=false${
-          brapiToken ? `&token=${brapiToken}` : ''
-        }`;
+        // Lista de fallbacks de ranges: se a API retornar erro 400 por limitação de plano no range maior (ex: 1y), tenta automatico os ranges menores (6mo, 3mo, 1mo) antes de falhar
+        const fallbackOrder = ['5y', '2y', '1y', '6mo', '3mo', '1mo'];
+        const initialRange = getRange(historyDays);
+        const rangesToTry = [initialRange];
+        const initialIdx = fallbackOrder.indexOf(initialRange);
+        if (initialIdx !== -1) {
+          for (let i = initialIdx + 1; i < fallbackOrder.length; i++) {
+            if (!rangesToTry.includes(fallbackOrder[i])) rangesToTry.push(fallbackOrder[i]);
+          }
+        }
 
-        const res = await fetch(url, { cache: 'no-store' });
-        if (!res.ok) return null;
-        const json = await res.json();
-        const result = json?.results?.[0];
+        let result = null;
+        for (const range of rangesToTry) {
+          const url = `https://brapi.dev/api/quote/${symbol}?range=${range}&interval=1d&fundamental=false${
+            brapiToken ? `&token=${brapiToken}` : ''
+          }`;
+          try {
+            const res = await fetch(url, { cache: 'no-store' });
+            if (!res.ok) continue;
+            const json = await res.json();
+            if (json?.results?.[0]?.historicalDataPrice?.length) {
+              result = json.results[0];
+              break;
+            }
+          } catch { continue; }
+        }
+
         if (!result?.historicalDataPrice?.length) return null;
 
         const data: StockData[] = result.historicalDataPrice
@@ -693,6 +712,8 @@ function StockPairAnalyzer() {
 
       if (!usedReal) {
         setFetchError(`Dados simulados — adicione um token brapi.dev para acessar todos os ativos`);
+      } else if (stock1.length < historyDays * 0.4 || stock2.length < historyDays * 0.4) {
+        setFetchError(`⚡ Dados Reais: a API retornou o período máximo de histórico disponível (${Math.min(stock1.length, stock2.length)} pregões reais) para o plano ou ativo selecionado.`);
       }
 
       // Fetch live quote for real-time price display
