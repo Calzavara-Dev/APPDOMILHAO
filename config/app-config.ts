@@ -104,16 +104,18 @@ export const APP_CONFIG = {
   },
 
   // 🌐 CONFIGURAÇÕES DE API
+  // ⚠️  Os tokens são lidos das variáveis de ambiente (arquivo .env.local).
+  //     NUNCA coloque tokens/chaves diretamente aqui no código!
   API: {
     // brapi.dev (Ações Brasileiras - B3)
     BRAPI: {
-      TOKEN: "tM1CShBhsaGYhJ1riPBGyE", // Token do usuário na brapi.dev
+      TOKEN: process.env.NEXT_PUBLIC_BRAPI_TOKEN || '', // Configure em .env.local
       BASE_URL: "https://brapi.dev/api",
     },
 
     // Alpha Vantage
     ALPHA_VANTAGE: {
-      API_KEY: "95SH7ZOVB2X40ZF4", // Sua chave da API (atualizada)
+      API_KEY: process.env.NEXT_PUBLIC_ALPHA_VANTAGE_KEY || '', // Configure em .env.local
       BASE_URL: "https://www.alphavantage.co/query",
       RATE_LIMIT: 5,           // Máximo de chamadas por minuto
       RETRY_ATTEMPTS: 3,       // Tentativas em caso de erro
@@ -192,34 +194,37 @@ export const APP_CONFIG = {
 
   // 🔒 CONFIGURAÇÕES DE SEGURANÇA
   SECURITY: {
-    // Configurações de CORS
+    // Configurações de CORS — nunca use "*" em produção com compras/dados sensíveis
     CORS: {
-      ENABLED: true,           // Habilitar CORS
-      ALLOWED_ORIGINS: ["*"],  // Origens permitidas
+      ENABLED: true,
+      ALLOWED_ORIGINS: [
+        "https://calzavara-dev.github.io", // GitHub Pages
+        "http://localhost:3000",            // Desenvolvimento local
+      ],
     },
 
     // Configurações de rate limiting
     RATE_LIMITING: {
-      ENABLED: true,           // Habilitar rate limiting
+      ENABLED: true,
       MAX_REQUESTS: 100,       // Máximo de requisições por hora
     },
   },
 
   // 📝 CONFIGURAÇÕES DE LOGGING
   LOGGING: {
-    // Níveis de log
-    LEVEL: "info",             // Nível de log (debug, info, warn, error)
+    // Logs desabilitados em produção para não vazar informações sensíveis
+    LEVEL: process.env.NODE_ENV === 'development' ? 'debug' : 'error',
 
     // Configurações de console
     CONSOLE: {
-      ENABLED: true,           // Habilitar logs no console
-      COLORED: true,           // Usar cores nos logs
+      ENABLED: process.env.NODE_ENV === 'development', // Apenas em dev
+      COLORED: process.env.NODE_ENV === 'development',
     },
 
     // Configurações de arquivo
     FILE: {
-      ENABLED: false,          // Habilitar logs em arquivo
-      MAX_SIZE: "10MB",        // Tamanho máximo do arquivo
+      ENABLED: false,
+      MAX_SIZE: "10MB",
     },
   },
 };
@@ -284,7 +289,9 @@ export const ConfigUtils = {
   // Resetar configurações para padrão
   reset: () => {
     // Implementar reset se necessário
-    console.log('Configurações resetadas para padrão');
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Configurações resetadas para padrão');
+    }
   },
 
   // Exportar configurações

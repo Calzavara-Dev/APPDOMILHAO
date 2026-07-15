@@ -397,6 +397,17 @@ const TABS: { key: TabKey; label: string; step: string; icon: React.ReactNode }[
 const LS_KEYS = { occPrefs: 'occurrence_prefs', zRanges: 'zscore_ranges_prefs' } as const;
 
 function StockPairAnalyzer() {
+  // ─── Funções de sanitização de segurança ──────────────────────────────────
+  // Sanitiza símbolos de ações: apenas letras maiúsculas e números, máx 6 chars
+  // Impede injeção de caracteres especiais em URLs de API
+  const sanitizeSymbol = (value: string): string =>
+    value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+
+  // Sanitiza tokens de API: apenas caracteres alfanuméricos e hífens, máx 64 chars
+  const sanitizeToken = (value: string): string =>
+    value.replace(/[^a-zA-Z0-9\-_]/g, '').slice(0, 64);
+  // ─────────────────────────────────────────────────────────────────────────
+
   const [stock1Symbol, setStock1Symbol] = useState("PETR3");
   const [stock2Symbol, setStock2Symbol] = useState("PETR4");
   const [stock1Data, setStock1Data] = useState<StockData[]>([]);
@@ -1202,7 +1213,7 @@ function StockPairAnalyzer() {
 
             {/* Stock selectors */}
             <div className="flex flex-wrap items-center gap-2">
-              <Select value={stock1Symbol} onValueChange={setStock1Symbol}>
+              <Select value={stock1Symbol} onValueChange={v => setStock1Symbol(sanitizeSymbol(v))}>
                 <SelectTrigger className="w-[180px] bg-fin-surface1 border-white/10 text-slate-200 hover:border-cyan-500/50 transition-colors">
                   <SelectValue />
                 </SelectTrigger>
@@ -1218,7 +1229,7 @@ function StockPairAnalyzer() {
 
               <div className="flex items-center gap-1 text-slate-500 font-bold text-sm">VS</div>
 
-              <Select value={stock2Symbol} onValueChange={setStock2Symbol}>
+              <Select value={stock2Symbol} onValueChange={v => setStock2Symbol(sanitizeSymbol(v))}>
                 <SelectTrigger className="w-[180px] bg-fin-surface1 border-white/10 text-slate-200 hover:border-violet-500/50 transition-colors">
                   <SelectValue />
                 </SelectTrigger>
@@ -1715,7 +1726,7 @@ function StockPairAnalyzer() {
                   className="input-dark flex-1"
                   placeholder="Insira seu token brapi.dev"
                   value={brapiToken}
-                  onChange={e => setBrapiToken(e.target.value)}
+                  onChange={e => setBrapiToken(sanitizeToken(e.target.value))}
                 />
                 {brapiToken && (
                   <button

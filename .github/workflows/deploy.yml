@@ -33,6 +33,10 @@ jobs:
       - name: Build Next.js site
         env:
           NEXT_PUBLIC_BASE_PATH: /APPDOMILHAO
+          # Tokens injetados via GitHub Secrets — configure em:
+          # Repositório → Settings → Secrets and variables → Actions
+          NEXT_PUBLIC_BRAPI_TOKEN: ${{ secrets.BRAPI_TOKEN }}
+          NEXT_PUBLIC_ALPHA_VANTAGE_KEY: ${{ secrets.ALPHA_VANTAGE_KEY }}
         run: npm run build
 
       - name: Upload artifact

@@ -1,0 +1,10 @@
+﻿# Security Headers — aplicados pelo GitHub Pages / Cloudflare CDN
+# Protege contra XSS, clickjacking e vazamento de dados
+
+/*
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+  X-XSS-Protection: 1; mode=block
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://icons.brapi.dev; connect-src 'self' https://brapi.dev https://www.alphavantage.co https://assets.mixkit.co; media-src 'self' https://assets.mixkit.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self';
