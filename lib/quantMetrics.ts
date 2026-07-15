@@ -43,7 +43,7 @@ export interface BacktestResult {
 }
 
 /**
- * Calcula estatísticas quantitativas avançadas para trading de pares (Long & Short)
+ * Calcula estatísticas quantitativas avançadas para trading de pares (Long & Short - Cointegração OLS)
  */
 export function calculatePairStats(
   stock1Data: { date: string; price: number }[],
@@ -73,7 +73,7 @@ export function calculatePairStats(
   const mean1 = sum1 / n;
   const mean2 = sum2 / n;
 
-  // 2. Pearson Correlation & Beta
+  // 2. Pearson Correlation & Beta OLS (Regressão Linear S1 vs S2)
   let num = 0,
     den1 = 0,
     den2 = 0;
@@ -90,7 +90,7 @@ export function calculatePairStats(
   const rSquared = correlation * correlation;
   const beta = den2 > 0 ? num / den2 : 1;
 
-  // 3. Estatísticas do Spread
+  // 3. Estatísticas do Spread Cointegrado
   let sumSpread = 0;
   for (let i = 0; i < n; i++) {
     sumSpread += spreadData[i].spread;
@@ -110,7 +110,8 @@ export function calculatePairStats(
   }
   const atr = n > 1 ? parseFloat((sumATR / (n - 1)).toFixed(2)) : 0;
 
-  // 5. Meia-Vida do Spread (Ornstein-Uhlenbeck / Autocorrelação AR1)
+  // 5. Meia-Vida do Spread (Ornstein-Uhlenbeck / Regressão AR(1))
+  // Modelo: (S_t - mu) = rho * (S_{t-1} - mu) + e_t
   let covAR1 = 0;
   let varAR1 = 0;
   for (let i = 1; i < n; i++) {
@@ -120,11 +121,11 @@ export function calculatePairStats(
     varAR1 += sPrev * sPrev;
   }
   let rho = varAR1 > 0 ? covAR1 / varAR1 : 0.85;
-  if (rho >= 0.99) rho = 0.98;
+  if (rho >= 0.995) rho = 0.995;
   if (rho <= 0.05) rho = 0.05;
 
   const lambda = -Math.log(rho);
-  const halfLifeDays = lambda > 0 ? Math.log(2) / lambda : 3.5;
+  const halfLifeDays = lambda > 0 ? Math.min(252, Math.max(1.0, Math.log(2) / lambda)) : 14.0;
 
   return {
     correlation: parseFloat(correlation.toFixed(2)),
@@ -138,7 +139,7 @@ export function calculatePairStats(
 }
 
 /**
- * Calcula Stop Loss, Take Profit e Sizing de Posição para o par
+ * Calcula Stop Loss, Take Profit e Sizing de Posição Beta-Neutro para o par
  */
 export function calculateStopLossTakeProfit(
   latestSpread: number,
@@ -150,19 +151,19 @@ export function calculateStopLossTakeProfit(
 ): StopLossResult {
   const { meanSpread, stdDevSpread, atr, beta } = stats;
 
-  // Stop: 1 ATR além do extremo atual na direção da operação
-  // Take Profit: retorno à média (picoSpreadCenter ~= meanSpread)
+  // Stop: 1.5 ATR (ou 0.75 desvios) além do spread atual na direção contrária
+  // Take Profit: retorno à média de equilíbrio da regressão (meanSpread)
   const atrBuffer = atr > 0 ? atr : stdDevSpread * 0.5;
 
   let stopLossSpread: number;
   let takeProfitSpread: number;
 
   if (latestZScore < 0) {
-    // LONG spread: entrada baixa, stop ainda mais baixo, TP na média
+    // LONG spread: compra S1 e vende S2 -> stop se spread cair mais, TP na média
     stopLossSpread = parseFloat((latestSpread - atrBuffer * 1.5).toFixed(2));
     takeProfitSpread = parseFloat((meanSpread).toFixed(2));
   } else {
-    // SHORT spread: entrada alta, stop ainda mais alto, TP na média
+    // SHORT spread: vende S1 e compra S2 -> stop se spread subir mais, TP na média
     stopLossSpread = parseFloat((latestSpread + atrBuffer * 1.5).toFixed(2));
     takeProfitSpread = parseFloat((meanSpread).toFixed(2));
   }
@@ -171,16 +172,17 @@ export function calculateStopLossTakeProfit(
   const rewardSpread = Math.abs(latestSpread - takeProfitSpread);
   const riskRewardRatio = riskSpread > 0 ? parseFloat((rewardSpread / riskSpread).toFixed(2)) : 0;
 
-  // Sizing: quanto comprar de cada ativo com o capital disponível
-  // Usamos beta para balancear: qty2 = qty1 * beta * (price1/price2)
+  // Sizing Beta-Neutro Institucional:
+  // Exposição na ponta comprada ~ Metade do Capital
+  // Exposição na ponta vendida = Exposição da ponta 1 * Beta (para neutralizar o risco sistêmico de mercado)
   const halfCapital = capitalReais / 2;
   const qty1 = latestPrice1 > 0 ? Math.floor(halfCapital / latestPrice1) : 0;
-  const qty2 = (latestPrice2 > 0 && beta > 0)
-    ? Math.floor((halfCapital * beta) / latestPrice2)
+  const qty2 = (latestPrice2 > 0 && beta > 0 && qty1 > 0)
+    ? Math.floor((qty1 * latestPrice1 * beta) / latestPrice2)
     : 0;
 
-  const maxLossReais = parseFloat((qty1 * riskSpread + qty2 * riskSpread * (1 / beta || 1)).toFixed(2));
-  const maxGainReais = parseFloat((qty1 * rewardSpread + qty2 * rewardSpread * (1 / beta || 1)).toFixed(2));
+  const maxLossReais = parseFloat((qty1 * riskSpread + qty2 * riskSpread * (1 / (beta || 1))).toFixed(2));
+  const maxGainReais = parseFloat((qty1 * rewardSpread + qty2 * rewardSpread * (1 / (beta || 1))).toFixed(2));
 
   return {
     entry1: latestPrice1,

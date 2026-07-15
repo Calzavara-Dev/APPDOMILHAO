@@ -67,16 +67,70 @@ const generateStockData = (symbol: string, days = 30): StockData[] => {
   return data;
 };
 
+const alignSeriesByDate = (stock1: StockData[], stock2: StockData[]): { aligned1: StockData[]; aligned2: StockData[] } => {
+  const map2 = new Map<string, number>();
+  stock2.forEach(d => { if (d.price > 0) map2.set(d.date, d.price); });
+
+  const aligned1: StockData[] = [];
+  const aligned2: StockData[] = [];
+
+  const sorted1 = [...stock1].filter(d => d.price > 0).sort((a, b) => a.date.localeCompare(b.date));
+
+  sorted1.forEach(d1 => {
+    if (map2.has(d1.date)) {
+      aligned1.push({ date: d1.date, price: d1.price });
+      aligned2.push({ date: d1.date, price: map2.get(d1.date)! });
+    }
+  });
+
+  return { aligned1, aligned2 };
+};
+
 const generateSpreadData = (stock1: StockData[], stock2: StockData[]): SpreadData[] => {
-  const data: SpreadData[] = [];
-  const minLength = Math.min(stock1.length, stock2.length);
-  for (let i = 0; i < minLength; i++) {
-    data.push({ date: stock1[i].date, spread: parseFloat((stock1[i].price - stock2[i].price).toFixed(2)), zScore: 0 });
+  const { aligned1, aligned2 } = alignSeriesByDate(stock1, stock2);
+  const n = Math.min(aligned1.length, aligned2.length);
+  if (n === 0) return [];
+
+  // 1. Calcula Beta da Regressão OLS (P1 vs P2) para o resíduo cointegrado
+  let sum1 = 0, sum2 = 0;
+  for (let i = 0; i < n; i++) {
+    sum1 += aligned1[i].price;
+    sum2 += aligned2[i].price;
   }
-  const spreads = data.map(d => d.spread);
-  const mean = spreads.reduce((a, b) => a + b, 0) / spreads.length;
-  const stdDev = Math.sqrt(spreads.map(x => Math.pow(x - mean, 2)).reduce((a, b) => a + b, 0) / spreads.length);
-  return data.map(d => ({ ...d, zScore: parseFloat(((d.spread - mean) / stdDev).toFixed(2)) }));
+  const mean1 = sum1 / n;
+  const mean2 = sum2 / n;
+
+  let cov = 0, var2 = 0;
+  for (let i = 0; i < n; i++) {
+    const diff1 = aligned1[i].price - mean1;
+    const diff2 = aligned2[i].price - mean2;
+    cov += diff1 * diff2;
+    var2 += diff2 * diff2;
+  }
+  const beta = var2 > 0 ? cov / var2 : 1;
+
+  // 2. Spread Cointegrado (Resíduo OLS: P1 - beta * P2)
+  const rawSpreads: { date: string; spread: number }[] = [];
+  let sumSpread = 0;
+  for (let i = 0; i < n; i++) {
+    const spreadVal = aligned1[i].price - beta * aligned2[i].price;
+    rawSpreads.push({ date: aligned1[i].date, spread: spreadVal });
+    sumSpread += spreadVal;
+  }
+  const meanSpread = sumSpread / n;
+
+  let varSpread = 0;
+  for (let i = 0; i < n; i++) {
+    varSpread += Math.pow(rawSpreads[i].spread - meanSpread, 2);
+  }
+  const stdDev = n > 1 ? Math.sqrt(varSpread / n) : 1;
+  const safeStdDev = stdDev > 0.0001 ? stdDev : 1;
+
+  return rawSpreads.map(d => ({
+    date: d.date,
+    spread: parseFloat(d.spread.toFixed(2)),
+    zScore: parseFloat(((d.spread - meanSpread) / safeStdDev).toFixed(2))
+  }));
 };
 
 const generateHistogramData = (spreadData: SpreadData[], binCount = 20): HistogramData[] => {
@@ -736,11 +790,12 @@ function StockPairAnalyzer() {
         setLivePrice1(null); setLivePrice2(null); setLiveChange1(null); setLiveChange2(null);
       }
 
+      const { aligned1, aligned2 } = alignSeriesByDate(stock1, stock2);
       setDataSource(usedReal ? "real" : "simulado");
-      setStock1Data(stock1);
-      setStock2Data(stock2);
+      setStock1Data(aligned1);
+      setStock2Data(aligned2);
       setIsLoading(false);
-      const spread = generateSpreadData(stock1, stock2);
+      const spread = generateSpreadData(aligned1, aligned2);
       setSpreadData(spread);
       const latest = spread[spread.length - 1];
       setLatestSpread(latest.spread);
@@ -761,7 +816,7 @@ function StockPairAnalyzer() {
         setRangeLines(lines);
       } else setRangeLines([]);
       setHistogramData(generateHistogramData(spread, histBins));
-      setDistributionStats(calculateDistributionStats(spread, stock1, stock2));
+      setDistributionStats(calculateDistributionStats(spread, aligned1, aligned2));
       setTopSpreads(calculateTopSpreads(spread));
     };
 
