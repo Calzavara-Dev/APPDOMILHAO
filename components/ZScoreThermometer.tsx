@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { HelpCircle, Sparkles, TrendingUp, TrendingDown, CheckCircle2, ChevronDown, ChevronUp } from "lucide-react";
+import { StockIcon } from "@/components/StockIcon";
 
 interface ZScoreThermometerProps {
   zScore: number;
@@ -9,6 +10,8 @@ interface ZScoreThermometerProps {
   stock2Symbol: string;
   halfLifeDays: number;
   spreadValue: number;
+  logoUrl1?: string;
+  logoUrl2?: string;
 }
 
 export function ZScoreThermometer({
@@ -17,6 +20,8 @@ export function ZScoreThermometer({
   stock2Symbol,
   halfLifeDays,
   spreadValue,
+  logoUrl1,
+  logoUrl2,
 }: ZScoreThermometerProps) {
   const [showGuide, setShowGuide] = useState(false);
 
@@ -42,9 +47,15 @@ export function ZScoreThermometer({
               Termômetro Didático do Spread
             </span>
           </div>
-          <h2 className="text-xl font-extrabold text-white">
-            Como interpretar o Z-Score agora?
-          </h2>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <div className="flex -space-x-1.5">
+              <StockIcon symbol={stock1Symbol} logoUrl={logoUrl1} size="md" className="border-cyan-500/40" />
+              <StockIcon symbol={stock2Symbol} logoUrl={logoUrl2} size="md" className="border-violet-500/40" />
+            </div>
+            <h2 className="text-xl font-extrabold text-white">
+              Interpretação: {stock1Symbol} vs {stock2Symbol}
+            </h2>
+          </div>
         </div>
 
         <button

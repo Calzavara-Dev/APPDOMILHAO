@@ -35,6 +35,7 @@ import {
   getNotifPermission, requestPermission, checkAndNotify, type NotifPermission
 } from "@/lib/pushNotification";
 import { ZScoreThermometer } from "@/components/ZScoreThermometer";
+import { StockIcon } from "@/components/StockIcon";
 
 
 // ─────────────────────────────────────────
@@ -543,6 +544,7 @@ function StockPairAnalyzer() {
   const [livePrice2, setLivePrice2] = useState<number | null>(null);
   const [liveChange1, setLiveChange1] = useState<number | null>(null);
   const [liveChange2, setLiveChange2] = useState<number | null>(null);
+  const [logoMap, setLogoMap] = useState<{ [symbol: string]: string }>({});
   const [activeTab, setActiveTab] = useState<TabKey>('diagnostico');
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
   const [leverage, setLeverage] = useState<number>(1);
@@ -787,6 +789,10 @@ function StockPairAnalyzer() {
           }))
           .filter((d: StockData) => d.price > 0);
 
+        if (result.logourl) {
+          setLogoMap(prev => ({ ...prev, [symbol]: result.logourl }));
+        }
+
         cacheRef.current[cacheKey] = { ts: now, data };
         return data.length > 0 ? data : null;
       } catch { return null; }
@@ -798,7 +804,11 @@ function StockPairAnalyzer() {
         const res = await fetch(url, { cache: 'no-store' });
         if (!res.ok) return null;
         const json = await res.json();
-        return json?.results?.[0] ?? null;
+        const resObj = json?.results?.[0] ?? null;
+        if (resObj?.logourl) {
+          setLogoMap(prev => ({ ...prev, [symbol]: resObj.logourl }));
+        }
+        return resObj;
       } catch { return null; }
     };
 
@@ -1326,8 +1336,14 @@ function StockPairAnalyzer() {
                     </div>
                     {ON_PN_PAIRS.map(p => (
                       <SelectItem key={`${p.s1}_${p.s2}`} value={`${p.s1}_${p.s2}`}>
-                        <span className="font-mono font-bold text-cyan-400">{p.s1} / {p.s2}</span>
-                        <span className="ml-2 text-slate-400 text-xs">{p.label}</span>
+                        <div className="flex items-center gap-2">
+                          <div className="flex -space-x-1">
+                            <StockIcon symbol={p.s1} logoUrl={logoMap[p.s1]} size="xs" />
+                            <StockIcon symbol={p.s2} logoUrl={logoMap[p.s2]} size="xs" />
+                          </div>
+                          <span className="font-mono font-bold text-cyan-400">{p.s1} / {p.s2}</span>
+                          <span className="ml-1 text-slate-400 text-xs hidden sm:inline">{p.label}</span>
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1368,8 +1384,11 @@ function StockPairAnalyzer() {
                   <SelectContent>
                     {BRAZILIAN_STOCKS.map(s => (
                       <SelectItem key={s.symbol} value={s.symbol}>
-                        <span className="font-mono font-semibold text-cyan-400">{s.symbol}</span>
-                        <span className="ml-2 text-slate-400 text-xs">{s.name}</span>
+                        <div className="flex items-center gap-2">
+                          <StockIcon symbol={s.symbol} logoUrl={logoMap[s.symbol]} size="xs" />
+                          <span className="font-mono font-semibold text-cyan-400">{s.symbol}</span>
+                          <span className="ml-1 text-slate-400 text-xs hidden sm:inline">{s.name}</span>
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1384,8 +1403,11 @@ function StockPairAnalyzer() {
                   <SelectContent>
                     {BRAZILIAN_STOCKS.filter(s => s.symbol !== stock1Symbol).map(s => (
                       <SelectItem key={s.symbol} value={s.symbol}>
-                        <span className="font-mono font-semibold text-violet-400">{s.symbol}</span>
-                        <span className="ml-2 text-slate-400 text-xs">{s.name}</span>
+                        <div className="flex items-center gap-2">
+                          <StockIcon symbol={s.symbol} logoUrl={logoMap[s.symbol]} size="xs" />
+                          <span className="font-mono font-semibold text-violet-400">{s.symbol}</span>
+                          <span className="ml-1 text-slate-400 text-xs hidden sm:inline">{s.name}</span>
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1476,9 +1498,19 @@ function StockPairAnalyzer() {
                   : '⚪ Equilíbrio Gaussiano / Neutro'}
               </span>
             </div>
-            <p className="text-xs font-semibold text-white mt-1">
-              {stock1Symbol} vs {stock2Symbol} — Spread atual: <strong className="font-mono text-cyan-300">{formatSpreadValue(latestSpread)}</strong> ({latestZScore >= 0 ? "+" : ""}{latestZScore.toFixed(2)} σ)
-            </p>
+            <div className="flex items-center gap-2 text-xs font-semibold text-white mt-1.5 flex-wrap">
+              <div className="flex items-center gap-1.5">
+                <StockIcon symbol={stock1Symbol} logoUrl={logoMap[stock1Symbol]} size="xs" />
+                <span>{stock1Symbol}</span>
+              </div>
+              <span className="text-slate-500">vs</span>
+              <div className="flex items-center gap-1.5">
+                <StockIcon symbol={stock2Symbol} logoUrl={logoMap[stock2Symbol]} size="xs" />
+                <span>{stock2Symbol}</span>
+              </div>
+              <span className="text-slate-500">—</span>
+              <span>Spread atual: <strong className="font-mono text-cyan-300">{formatSpreadValue(latestSpread)}</strong> ({latestZScore >= 0 ? "+" : ""}{latestZScore.toFixed(2)} σ)</span>
+            </div>
           </div>
         </div>
 
@@ -1564,6 +1596,8 @@ function StockPairAnalyzer() {
             stock2Symbol={stock2Symbol}
             halfLifeDays={pairStats.halfLifeDays}
             spreadValue={latestSpread}
+            logoUrl1={logoMap[stock1Symbol]}
+            logoUrl2={logoMap[stock2Symbol]}
           />
 
           {/* 2. Cards das Cotações Lado a Lado */}
@@ -1571,9 +1605,12 @@ function StockPairAnalyzer() {
             {/* Stock 1 Card */}
             <div className="glass rounded-2xl p-6 border border-cyan-500/20 hover:border-cyan-500/40 transition-all">
               <div className="flex items-center justify-between mb-4">
-                <div>
-                  <span className="font-mono text-xl font-black text-cyan-400">{stock1Symbol}</span>
-                  <p className="text-xs text-slate-500 mt-0.5">{getStockName(stock1Symbol)}</p>
+                <div className="flex items-center gap-3">
+                  <StockIcon symbol={stock1Symbol} logoUrl={logoMap[stock1Symbol]} size="lg" className="border-cyan-500/40 shadow-glow-cyan" />
+                  <div>
+                    <span className="font-mono text-xl font-black text-cyan-400">{stock1Symbol}</span>
+                    <p className="text-xs text-slate-500 mt-0.5">{getStockName(stock1Symbol)}</p>
+                  </div>
                 </div>
                 <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center">
                   <TrendingUp className="w-5 h-5 text-cyan-400" />
@@ -1588,9 +1625,12 @@ function StockPairAnalyzer() {
             {/* Stock 2 Card */}
             <div className="glass rounded-2xl p-6 border border-violet-500/20 hover:border-violet-500/40 transition-all">
               <div className="flex items-center justify-between mb-4">
-                <div>
-                  <span className="font-mono text-xl font-black text-violet-400">{stock2Symbol}</span>
-                  <p className="text-xs text-slate-500 mt-0.5">{getStockName(stock2Symbol)}</p>
+                <div className="flex items-center gap-3">
+                  <StockIcon symbol={stock2Symbol} logoUrl={logoMap[stock2Symbol]} size="lg" className="border-violet-500/40 shadow-lg" />
+                  <div>
+                    <span className="font-mono text-xl font-black text-violet-400">{stock2Symbol}</span>
+                    <p className="text-xs text-slate-500 mt-0.5">{getStockName(stock2Symbol)}</p>
+                  </div>
                 </div>
                 <div className="w-10 h-10 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
                   <TrendingUp className="w-5 h-5 text-violet-400" />
@@ -2510,7 +2550,11 @@ function StockPairAnalyzer() {
                   }`}
                 >
                   <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex -space-x-1.5">
+                        <StockIcon symbol={s1} logoUrl={logoMap[s1]} size="sm" />
+                        <StockIcon symbol={s2} logoUrl={logoMap[s2]} size="sm" />
+                      </div>
                       <span className="font-mono font-bold text-cyan-400 text-sm">{s1}</span>
                       <span className="text-slate-600 text-xs">vs</span>
                       <span className="font-mono font-bold text-violet-400 text-sm">{s2}</span>
