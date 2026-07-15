@@ -545,6 +545,7 @@ function StockPairAnalyzer() {
   const [liveChange1, setLiveChange1] = useState<number | null>(null);
   const [liveChange2, setLiveChange2] = useState<number | null>(null);
   const [logoMap, setLogoMap] = useState<{ [symbol: string]: string }>({});
+  const [operationMode, setOperationMode] = useState<'custody_swap' | 'traditional_ls'>('custody_swap');
   const [activeTab, setActiveTab] = useState<TabKey>('diagnostico');
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
   const [leverage, setLeverage] = useState<number>(1);
@@ -671,11 +672,11 @@ function StockPairAnalyzer() {
         camadaSugestao: resultadoCamadas?.camadaAtualSugestao,
       });
       setSignalHistory(loadSignals());
-      // Verifica notificação
-      checkAndNotify(`${stock1Symbol}/${stock2Symbol}`, latestZScore, 1.5);
+      // Verifica notificação granular por camada
+      checkAndNotify(`${stock1Symbol}/${stock2Symbol}`, latestZScore, operationMode);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [signal, stock1Symbol, stock2Symbol]);
+  }, [signal, stock1Symbol, stock2Symbol, operationMode]);
 
   // ── Calculadora Stop Loss / Sizing ──
   const handleCalculateSizing = useCallback(() => {
@@ -1376,6 +1377,28 @@ function StockPairAnalyzer() {
                 </Select>
               </div>
 
+              {/* Seletor de Modo Operacional (Troca de Custódia vs L&S) */}
+              <div className="col-span-2 sm:col-span-1 w-full sm:w-auto">
+                <Select value={operationMode} onValueChange={v => setOperationMode(v as 'custody_swap' | 'traditional_ls')}>
+                  <SelectTrigger className="w-full sm:w-[210px] bg-fin-surface1 border-amber-500/30 text-amber-300 font-semibold hover:border-amber-400 transition-colors" title="Modo Operacional">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-white/10 mb-1">
+                      🎯 Modo Operacional
+                    </div>
+                    <SelectItem value="custody_swap">
+                      <span className="font-semibold text-amber-300">🔄 Troca de Custódia (ON/PN)</span>
+                      <span className="block text-[11px] text-slate-400">Sem Aluguel BTC / Sem Short</span>
+                    </SelectItem>
+                    <SelectItem value="traditional_ls">
+                      <span className="font-semibold text-cyan-300">⚡ L&S Tradicional</span>
+                      <span className="block text-[11px] text-slate-400">Com Aluguel BTC e Margem</span>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div className="col-span-2 flex flex-wrap sm:flex-nowrap items-center gap-2 w-full sm:w-auto">
                 <Select value={stock1Symbol} onValueChange={v => setStock1Symbol(sanitizeSymbol(v))}>
                   <SelectTrigger className="flex-1 min-w-[120px] sm:w-[140px] bg-fin-surface1 border-white/10 text-slate-200 hover:border-cyan-500/50 transition-colors">
@@ -1484,17 +1507,23 @@ function StockPairAnalyzer() {
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs font-black uppercase tracking-wider text-slate-400">Farol Quantitativo</span>
-              <span className={`px-2 py-0.5 rounded-full text-[11px] font-extrabold uppercase tracking-wide border ${
+              <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-extrabold uppercase tracking-wide border ${
                 latestZScore <= -1.5 || signal === 'LONG'
                   ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
                   : latestZScore >= 1.5 || signal === 'SHORT'
                   ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
                   : 'bg-slate-500/20 text-slate-300 border-slate-500/40'
               }`}>
-                {latestZScore <= -1.5 || signal === 'LONG'
-                  ? '🟢 Sinal de Compra do Spread'
+                {operationMode === 'custody_swap'
+                  ? latestZScore <= -1.5 || signal === 'LONG'
+                    ? `🔄 Troca de Custódia: Vender ${stock2Symbol} e Comprar ${stock1Symbol}`
+                    : latestZScore >= 1.5 || signal === 'SHORT'
+                    ? `🔄 Troca de Custódia: Vender ${stock1Symbol} e Comprar ${stock2Symbol}`
+                    : `⚪ Aguardar na Custódia Atual (Equilíbrio 0 σ)`
+                  : latestZScore <= -1.5 || signal === 'LONG'
+                  ? '🟢 Sinal de Compra (LONG) do Spread'
                   : latestZScore >= 1.5 || signal === 'SHORT'
-                  ? '🔴 Sinal de Venda do Spread'
+                  ? '🔴 Sinal de Venda (SHORT) do Spread'
                   : '⚪ Equilíbrio Gaussiano / Neutro'}
               </span>
             </div>
@@ -2401,53 +2430,92 @@ function StockPairAnalyzer() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Sizing Card */}
                 <div className="bg-white/5 rounded-xl border border-white/10 p-4 space-y-3">
-                  <h3 className="text-xs font-bold text-cyan-400 uppercase tracking-wider">📦 Sizing Beta-Neutro (Long & Short)</h3>
+                  <h3 className="text-xs font-bold text-cyan-400 uppercase tracking-wider">
+                    {operationMode === 'custody_swap' ? '🔄 Sizing Troca de Custódia (1:1 / Proporcional)' : '📦 Sizing Beta-Neutro (Long & Short)'}
+                  </h3>
                   <div className="flex justify-between items-center py-1.5 border-b border-white/5">
-                    <span className="text-xs text-slate-400">{stock1Symbol} (LONG)</span>
+                    <span className="text-xs text-slate-400">
+                      {operationMode === 'custody_swap'
+                        ? latestZScore <= -1.5
+                          ? `Comprar Nova Ação (${stock1Symbol})`
+                          : `Vender da Custódia (${stock1Symbol})`
+                        : `${stock1Symbol} (LONG)`}
+                    </span>
                     <span className="font-mono font-bold text-emerald-400">{stopLossResult.qty1} ações</span>
                   </div>
                   <div className="flex justify-between items-center py-1.5 border-b border-white/5">
-                    <span className="text-xs text-slate-400">{stock2Symbol} (SHORT)</span>
+                    <span className="text-xs text-slate-400">
+                      {operationMode === 'custody_swap'
+                        ? latestZScore <= -1.5
+                          ? `Vender da Custódia (${stock2Symbol})`
+                          : `Comprar Nova Ação (${stock2Symbol})`
+                        : `${stock2Symbol} (SHORT)`}
+                    </span>
                     <span className="font-mono font-bold text-red-400">{stopLossResult.qty2} ações</span>
                   </div>
                   <div className="flex justify-between items-center py-1.5">
                     <span className="text-xs text-slate-400">Capital Total Alocado</span>
                     <span className="font-mono font-bold text-white">R$ {capitalReais.toLocaleString('pt-BR')}</span>
                   </div>
-                  <p className="text-[11px] text-slate-500 mt-1">
-                    Sizing balanceado usando Beta = {pairStats.beta} para neutralidade direcional.
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    {operationMode === 'custody_swap'
+                      ? `Sem aluguel BTC ou ponta vendida a descoberto! A venda ocorre da ação que você já possui em carteira para migração ao par com spread favorável.`
+                      : `Sizing balanceado usando Beta = ${pairStats.beta} para neutralidade direcional.`}
                   </p>
                 </div>
 
-                {/* Stop Loss & Take Profit */}
+                {/* Stop Loss & Take Profit ou Acumulação em Grade */}
                 <div className="bg-white/5 rounded-xl border border-white/10 p-4 space-y-3">
-                  <h3 className="text-xs font-bold text-violet-400 uppercase tracking-wider">🎯 Níveis de Controle de Risco</h3>
-                  <div className="flex justify-between items-center py-1.5 border-b border-white/5">
-                    <span className="text-xs text-slate-400">Spread Atual (Entrada)</span>
-                    <span className="font-mono font-bold text-white">{formatSpreadValue(latestSpread)}</span>
-                  </div>
-                  <div className="flex justify-between items-center py-1.5 border-b border-white/5">
-                    <span className="text-xs text-slate-400">🔴 Stop Loss (Spread)</span>
-                    <span className="font-mono font-bold text-red-400">{formatSpreadValue(stopLossResult.stopLossSpread)}</span>
-                  </div>
-                  <div className="flex justify-between items-center py-1.5 border-b border-white/5">
-                    <span className="text-xs text-slate-400">🟢 Take Profit (Spread)</span>
-                    <span className="font-mono font-bold text-emerald-400">{formatSpreadValue(stopLossResult.takeProfitSpread)}</span>
-                  </div>
-                  <div className="flex justify-between items-center py-1.5 border-b border-white/5">
-                    <span className="text-xs text-slate-400">📊 Risk/Reward</span>
-                    <span className={`font-mono font-bold ${stopLossResult.riskRewardRatio >= 1.5 ? 'text-emerald-400' : 'text-amber-400'}`}>
-                      1 : {stopLossResult.riskRewardRatio}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center py-1.5 border-b border-white/5">
-                    <span className="text-xs text-slate-400">Perda Máxima Est.</span>
-                    <span className="font-mono font-bold text-red-400">- R$ {stopLossResult.maxLossReais.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between items-center py-1.5">
-                    <span className="text-xs text-slate-400">Ganho Máximo Est.</span>
-                    <span className="font-mono font-bold text-emerald-400">+ R$ {stopLossResult.maxGainReais.toFixed(2)}</span>
-                  </div>
+                  <h3 className="text-xs font-bold text-violet-400 uppercase tracking-wider">
+                    {operationMode === 'custody_swap' ? '🎯 Gestão por Camadas & Reversão (Sem Stop Loss)' : '🎯 Níveis de Controle de Risco'}
+                  </h3>
+                  {operationMode === 'custody_swap' ? (
+                    <div className="space-y-2 text-xs text-slate-300">
+                      <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 font-medium">
+                        💡 Em pares ON/PN da mesma empresa, <strong>não é necessário nem recomendado acionar Stop Loss direcional</strong>. A empresa é a mesma e a distorção obedece à reversão gaussiana à média.
+                      </div>
+                      <div className="flex justify-between py-1 border-b border-white/5">
+                        <span className="text-slate-400">Spread Atual (Desvio)</span>
+                        <span className="font-mono font-bold text-cyan-300">{formatSpreadValue(latestSpread)} ({latestZScore.toFixed(2)} σ)</span>
+                      </div>
+                      <div className="flex justify-between py-1 border-b border-white/5">
+                        <span className="text-slate-400">Alvo de Saída (Equilíbrio)</span>
+                        <span className="font-mono font-bold text-emerald-400">0.00 σ (~R$ {(latestSpread - latestZScore * pairStats.atr).toFixed(2)})</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400">
+                        Estratégia: Se o spread abrir para ±2.0 σ, acumule mais lotes em camada escalonada e aguarde o retorno para 0 σ.
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                        <span className="text-xs text-slate-400">Spread Atual (Entrada)</span>
+                        <span className="font-mono font-bold text-white">{formatSpreadValue(latestSpread)}</span>
+                      </div>
+                      <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                        <span className="text-xs text-slate-400">🔴 Stop Loss (Spread)</span>
+                        <span className="font-mono font-bold text-red-400">{formatSpreadValue(stopLossResult.stopLossSpread)}</span>
+                      </div>
+                      <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                        <span className="text-xs text-slate-400">🟢 Take Profit (Spread)</span>
+                        <span className="font-mono font-bold text-emerald-400">{formatSpreadValue(stopLossResult.takeProfitSpread)}</span>
+                      </div>
+                      <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                        <span className="text-xs text-slate-400">📊 Risk/Reward</span>
+                        <span className={`font-mono font-bold ${stopLossResult.riskRewardRatio >= 1.5 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                          1 : {stopLossResult.riskRewardRatio}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                        <span className="text-xs text-slate-400">Perda Máxima Est.</span>
+                        <span className="font-mono font-bold text-red-400">- R$ {stopLossResult.maxLossReais.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between items-center py-1.5">
+                        <span className="text-xs text-slate-400">Ganho Máximo Est.</span>
+                        <span className="font-mono font-bold text-emerald-400">+ R$ {stopLossResult.maxGainReais.toFixed(2)}</span>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {/* ATR */}
