@@ -1,13 +1,21 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+import { Plus_Jakarta_Sans, Inter } from 'next/font/google'
 import './globals.css'
 
-const inter = Inter({ 
+const jakartaSans = Plus_Jakarta_Sans({
+  subsets: ['latin'],
+  variable: '--font-jakarta',
+  display: 'swap',
+  weight: ['400', '500', '600', '700', '800'],
+});
+
+const inter = Inter({
   subsets: ['latin'],
   variable: '--font-inter',
   display: 'swap',
   weight: ['300', '400', '500', '600', '700', '800'],
 })
+
 
 export const metadata: Metadata = {
   title: 'SpreadTrader — Análise de Pares',
@@ -48,7 +56,7 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/icon-192x192.png" />
         <link rel="manifest" href="/manifest.json" />
       </head>
-      <body className={`${inter.variable} font-sans antialiased`}>
+      <body className={`${inter.variable} ${jakartaSans.variable} font-sans antialiased`}>
         {children}
       </body>
     </html>

@@ -1158,147 +1158,126 @@ function StockPairAnalyzer() {
 
   // ─── RENDER ───
   return (
-    <div className="min-h-screen p-4 md:p-6 lg:p-8 max-w-[1600px] mx-auto">
+    <div className="min-h-screen px-3 pt-4 pb-6 sm:px-4 md:px-6 lg:px-8 max-w-[1600px] mx-auto app-container">
 
-      {/* Error banner */}
+      {/* Banner de aviso — dados simulados ou aviso de API */}
       {fetchError && (
-        <div className="mb-4 flex items-center gap-3 rounded-xl px-4 py-3 text-sm bg-amber-500/10 border border-amber-500/30 text-amber-300 animate-fade-in">
-          <span className="text-base">⚠️</span>
-          <span>{fetchError}</span>
-          <a href="https://brapi.dev" target="_blank" rel="noopener noreferrer" className="ml-auto underline hover:text-amber-200 whitespace-nowrap">Obter token grátis →</a>
+        <div className="mb-4 flex flex-col sm:flex-row sm:items-center gap-2 rounded-2xl px-4 py-3.5 text-sm bg-amber-500/8 border border-amber-500/25 text-amber-300 animate-fade-in">
+          <div className="flex items-start gap-2">
+            <span className="text-base shrink-0 mt-0.5">⚠️</span>
+            <span className="leading-snug">{fetchError}</span>
+          </div>
+          <a href="https://brapi.dev" target="_blank" rel="noopener noreferrer"
+             className="btn-inline sm:ml-auto shrink-0 text-xs font-semibold underline hover:text-amber-200 transition-colors">
+            Obter token gratuito &rarr;
+          </a>
         </div>
       )}
 
-      {/* Loading overlay */}
+      {/* Indicador de carregamento */}
       {isLoading && (
-        <div className="fixed top-4 right-4 z-50 flex items-center gap-2 rounded-full px-4 py-2 text-xs glass border border-cyan-500/30 text-cyan-400 animate-fade-in">
+        <div className="fixed top-4 right-4 z-50 flex items-center gap-2 rounded-full px-4 py-2.5 text-xs glass border border-cyan-500/30 text-cyan-300 animate-fade-in shadow-lg shadow-cyan-500/10">
           <span className="w-2 h-2 rounded-full bg-cyan-400 animate-dot-pulse" />
-          Atualizando dados...
+          Buscando cotações...
         </div>
       )}
-      {/* ════════════════════════════════════
-          HEADER
-      ════════════════════════════════════ */}
-      <header className="mb-8 animate-fade-in">
-        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+      {/* HEADER */}
+      <header className="mb-5 animate-fade-in">
+        {/* Linha 1: Logo + ações rápidas */}
+        <div className="flex items-center justify-between gap-3 mb-4">
           {/* Brand */}
-          <div>
-            <div className="flex items-center gap-3 mb-1">
-              <div className="w-9 h-9 rounded-xl bg-fin-gradient flex items-center justify-center shadow-glow-cyan">
-                <Zap className="w-5 h-5 text-white" />
-              </div>
-              <h1 className="text-2xl font-bold tracking-tight">
-                <span className="text-white">Spread</span>
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-violet-400">Trader</span>
-              </h1>
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-500 to-violet-600 flex items-center justify-center shadow-lg shadow-cyan-500/20 shrink-0">
+              <Zap className="w-4 h-4 text-white" />
             </div>
-            <p className="text-sm text-slate-500 ml-12">Análise de pares · Distribuição Gaussiana · B3</p>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-jakarta font-extrabold tracking-tight leading-none">
+                <span className="text-white">Spread</span><span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-violet-400">Trader</span>
+              </h1>
+              <p className="text-[11px] text-slate-500 font-medium hidden sm:block">Análise de pares · B3</p>
+            </div>
           </div>
 
-          {/* Status + Pair Selectors */}
-          <div className="flex flex-col gap-3">
-            {/* Status badges */}
-            <div className="flex items-center gap-2 justify-end">
-              <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${dataSource === 'real' ? 'badge-real' : 'badge-simulated'}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${dataSource === 'real' ? 'bg-emerald-400 animate-dot-pulse' : 'bg-amber-400'}`} />
-                {dataSource === 'real' ? 'Dados Reais' : 'Simulado'}
-              </span>
-              <button
-                onClick={() => setActiveTab('camadas')}
-                className="inline-flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
-              >
-                <ChevronRight className="w-3 h-3" /> Grade & Frequência
-              </button>
-            </div>
+          {/* Botões de ação rápida */}
+          <div className="flex items-center gap-1.5">
+            {/* Badge de fonte dos dados */}
+            <span className={`btn-inline inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+              dataSource === 'real' ? 'badge-real' : 'badge-simulated'
+            }`}>
+              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                dataSource === 'real' ? 'bg-emerald-400 animate-dot-pulse' : 'bg-amber-400'
+              }`} />
+              <span className="hidden sm:inline">{dataSource === 'real' ? '✅ Ao Vivo' : '🔦 Simulado'}</span>
+              <span className="sm:hidden">{dataSource === 'real' ? '✅' : '🔦'}</span>
+            </span>
 
-            {/* Stock selectors */}
-            <div className="flex flex-wrap items-center gap-2">
-              <Select value={stock1Symbol} onValueChange={v => setStock1Symbol(sanitizeSymbol(v))}>
-                <SelectTrigger className="w-[180px] bg-fin-surface1 border-white/10 text-slate-200 hover:border-cyan-500/50 transition-colors">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {BRAZILIAN_STOCKS.map(s => (
-                    <SelectItem key={s.symbol} value={s.symbol}>
-                      <span className="font-mono font-semibold text-cyan-400">{s.symbol}</span>
-                      <span className="ml-2 text-slate-400 text-xs">{s.name}</span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            {/* Tema */}
+            <button
+              onClick={() => setIsDark(d => !d)}
+              className="w-10 h-10 rounded-xl glass hover:border-white/20 transition-all flex items-center justify-center text-slate-400 hover:text-amber-400"
+              aria-label={isDark ? 'Ativar modo claro' : 'Ativar modo escuro'}
+            >
+              {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
 
-              <div className="flex items-center gap-1 text-slate-500 font-bold text-sm">VS</div>
+            {/* Notificações */}
+            <button
+              onClick={async () => { const perm = await requestPermission(); setNotifPermission(perm); }}
+              className={`w-10 h-10 rounded-xl glass transition-all flex items-center justify-center ${
+                notifPermission === 'granted'
+                  ? 'text-emerald-400 border-emerald-500/30'
+                  : notifPermission === 'denied'
+                  ? 'text-red-400 opacity-40 cursor-not-allowed'
+                  : 'text-slate-400 hover:text-cyan-400 hover:border-white/20'
+              }`}
+              aria-label="Alertas"
+              title={notifPermission === 'granted' ? 'Alertas ativos' : notifPermission === 'denied' ? 'Alertas bloqueados' : 'Ativar alertas'}
+              disabled={notifPermission === 'denied'}
+            >
+              {notifPermission === 'granted' ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
+            </button>
 
-              <Select value={stock2Symbol} onValueChange={v => setStock2Symbol(sanitizeSymbol(v))}>
-                <SelectTrigger className="w-[180px] bg-fin-surface1 border-white/10 text-slate-200 hover:border-violet-500/50 transition-colors">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {BRAZILIAN_STOCKS.filter(s => s.symbol !== stock1Symbol).map(s => (
-                    <SelectItem key={s.symbol} value={s.symbol}>
-                      <span className="font-mono font-semibold text-violet-400">{s.symbol}</span>
-                      <span className="ml-2 text-slate-400 text-xs">{s.name}</span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <button
-                onClick={() => setShowSettingsModal(true)}
-                className="w-9 h-9 rounded-xl glass hover:border-white/20 transition-all flex items-center justify-center text-slate-400 hover:text-slate-200"
-                aria-label="Configurações"
-              >
-                <Settings className="w-4 h-4" />
-              </button>
-
-              {/* Dark / Light Mode Toggle */}
-              <button
-                onClick={() => setIsDark(d => !d)}
-                className="w-9 h-9 rounded-xl glass hover:border-white/20 transition-all flex items-center justify-center text-slate-400 hover:text-amber-400"
-                aria-label={isDark ? 'Ativar modo claro' : 'Ativar modo escuro'}
-                title={isDark ? 'Modo Claro' : 'Modo Escuro'}
-              >
-                {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-              </button>
-
-              {/* Notificações */}
-              <button
-                onClick={async () => {
-                  const perm = await requestPermission();
-                  setNotifPermission(perm);
-                }}
-                className={`w-9 h-9 rounded-xl glass transition-all flex items-center justify-center ${
-                  notifPermission === 'granted'
-                    ? 'text-emerald-400 border-emerald-500/30'
-                    : notifPermission === 'denied'
-                    ? 'text-red-400 border-red-500/20 opacity-50 cursor-not-allowed'
-                    : 'text-slate-400 hover:text-cyan-400 hover:border-white/20'
-                }`}
-                aria-label="Alertas"
-                title={notifPermission === 'granted' ? 'Alertas ativos' : notifPermission === 'denied' ? 'Alertas bloqueados' : 'Ativar alertas'}
-                disabled={notifPermission === 'denied'}
-              >
-                {notifPermission === 'granted' ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
-              </button>
-            </div>
+            {/* Configurações */}
+            <button
+              onClick={() => setShowSettingsModal(true)}
+              className="w-10 h-10 rounded-xl glass hover:border-white/20 transition-all flex items-center justify-center text-slate-400 hover:text-slate-200"
+              aria-label="Configurações"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
           </div>
         </div>
 
-        <div className="section-divider mt-6" />
+        <div className="flex items-center gap-2">
+          <Select value={stock1Symbol} onValueChange={v => setStock1Symbol(sanitizeSymbol(v))}>
+            <SelectTrigger className="flex-1 bg-white/5 border-white/10 text-slate-200 rounded-xl h-10 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {BRAZILIAN_STOCKS.map(s => <SelectItem key={s.symbol} value={s.symbol}>{s.symbol}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <div className="text-slate-500 font-black text-xs">vs</div>
+          <Select value={stock2Symbol} onValueChange={v => setStock2Symbol(sanitizeSymbol(v))}>
+            <SelectTrigger className="flex-1 bg-white/5 border-white/10 text-slate-200 rounded-xl h-10 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {BRAZILIAN_STOCKS.filter(s => s.symbol !== stock1Symbol).map(s => <SelectItem key={s.symbol} value={s.symbol}>{s.symbol}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
       </header>
 
-      {/* ════════════════════════════════════
-          COCKPIT EXECUTIVO DO PAR (BARRA OPERACIONAL COMPACTA)
-      ════════════════════════════════════ */}
-      <div className="mb-6 p-4 rounded-2xl glass border border-white/10 flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4">
-        {/* Lado esquerdo: Farol e Sinal */}
-        <div className="flex items-center gap-3.5">
-          <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${
+      {/* COCKPIT EXECUTIVO */}
+      <div className="mb-5 p-4 rounded-2xl glass border border-white/8 animate-fade-in">
+        <div className="flex items-center gap-3">
+          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
             latestZScore <= -1.5 || signal === 'LONG'
-              ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-400'
+              ? 'bg-emerald-500/15 border border-emerald-500/35 text-emerald-400'
               : latestZScore >= 1.5 || signal === 'SHORT'
-              ? 'bg-rose-500/20 border border-rose-500/40 text-rose-400'
-              : 'bg-cyan-500/20 border border-cyan-500/40 text-cyan-400'
+              ? 'bg-rose-500/15 border border-rose-500/35 text-rose-400'
+              : 'bg-slate-500/15 border border-slate-500/25 text-slate-400'
           }`}>
             {latestZScore <= -1.5 || signal === 'LONG' ? (
               <TrendingUp className="w-6 h-6 animate-pulse" />
@@ -1308,72 +1287,66 @@ function StockPairAnalyzer() {
               <Compass className="w-6 h-6" />
             )}
           </div>
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-black uppercase tracking-wider text-slate-400">Farol Quantitativo</span>
-              <span className={`px-2 py-0.5 rounded-full text-[11px] font-extrabold uppercase tracking-wide border ${
+
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-2 mb-0.5">
+              <span className={`btn-inline inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border ${
                 latestZScore <= -1.5 || signal === 'LONG'
-                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/35'
                   : latestZScore >= 1.5 || signal === 'SHORT'
-                  ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
-                  : 'bg-slate-500/20 text-slate-300 border-slate-500/40'
+                  ? 'bg-rose-500/15 text-rose-300 border-rose-500/35'
+                  : 'bg-slate-500/15 text-slate-300 border-slate-500/30'
               }`}>
                 {latestZScore <= -1.5 || signal === 'LONG'
-                  ? '🟢 Sinal de Compra do Spread'
+                  ? '🟢 Comprar Spread'
                   : latestZScore >= 1.5 || signal === 'SHORT'
-                  ? '🔴 Sinal de Venda do Spread'
-                  : '⚪ Equilíbrio Gaussiano / Neutro'}
+                  ? '🔴 Vender Spread'
+                  : '⚪ Em Equilíbrio'}
               </span>
             </div>
-            <p className="text-xs font-semibold text-white mt-1">
-              {stock1Symbol} vs {stock2Symbol} — Spread atual: <strong className="font-mono text-cyan-300">R$ {latestSpread.toFixed(2)}</strong> ({latestZScore >= 0 ? "+" : ""}{latestZScore.toFixed(2)} σ)
+            <p className="text-xs text-slate-400 truncate">
+              <span className="font-semibold text-white">{stock1Symbol}</span>
+              <span className="mx-1 text-slate-600">vs</span>
+              <span className="font-semibold text-white">{stock2Symbol}</span>
+              <span className="mx-2 text-slate-600">&middot;</span>
+              Spread <span className="font-mono font-bold text-cyan-300">R$ {latestSpread.toFixed(2)}</span>
+              <span className="text-slate-500 ml-1">({latestZScore >= 0 ? "+" : ""}{latestZScore.toFixed(2)} σ)</span>
             </p>
-          </div>
-        </div>
-
-        {/* Lado direito: 4 KPIs essenciais compactos + Ação */}
-        <div className="flex items-center gap-3 flex-wrap xl:flex-nowrap w-full xl:w-auto justify-between xl:justify-end">
-          <div className="flex items-center gap-4 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs">
-            <div>
-              <span className="text-slate-400 block text-[10px] uppercase font-bold">Correlação</span>
-              <span className="font-mono font-bold text-white">{(pairStats.correlation * 100).toFixed(0)}% (R² {pairStats.rSquared})</span>
-            </div>
-            <div className="w-px h-6 bg-white/10" />
-            <div>
-              <span className="text-slate-400 block text-[10px] uppercase font-bold">Meia-Vida</span>
-              <span className="font-mono font-bold text-violet-300">~{pairStats.halfLifeDays} dias</span>
-            </div>
-            <div className="w-px h-6 bg-white/10" />
-            <div>
-              <span className="text-slate-400 block text-[10px] uppercase font-bold">Beta</span>
-              <span className="font-mono font-bold text-cyan-300">{pairStats.beta}</span>
-            </div>
           </div>
 
           <button
             onClick={handleCopyReport}
-            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-cyan-500 to-violet-500 text-slate-950 hover:opacity-90 transition-all shadow-lg shadow-cyan-500/20 shrink-0"
+            className="btn-inline shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-cyan-500 to-violet-500 text-slate-950 hover:opacity-90 transition-all shadow-md shadow-cyan-500/20"
           >
-            {copiedReport ? (
-              <>
-                <Check className="w-4 h-4" />
-                <span>Estudo Copiado!</span>
-              </>
-            ) : (
-              <>
-                <Share2 className="w-4 h-4" />
-                <span>Copiar Estudo</span>
-              </>
-            )}
+            {copiedReport
+              ? <><Check className="w-3.5 h-3.5" /><span className="hidden sm:inline">Copiado!</span></>
+              : <><Share2 className="w-3.5 h-3.5" /><span className="hidden sm:inline">Copiar</span></>}
           </button>
+        </div>
+
+        {/* KPIs compactos */}
+        <div className="mt-3 pt-3 border-t border-white/6 grid grid-cols-3 gap-3 text-center">
+          <div>
+            <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wide block">Correlação</span>
+            <span className="font-mono font-bold text-white text-sm">{(pairStats.correlation * 100).toFixed(0)}%</span>
+            <span className="text-[10px] text-slate-600 block">R² {pairStats.rSquared}</span>
+          </div>
+          <div>
+            <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wide block">Meia-Vida</span>
+            <span className="font-mono font-bold text-violet-300 text-sm">~{pairStats.halfLifeDays}d</span>
+            <span className="text-[10px] text-slate-600 block">reversão</span>
+          </div>
+          <div>
+            <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wide block">Beta</span>
+            <span className="font-mono font-bold text-cyan-300 text-sm">{pairStats.beta}</span>
+            <span className="text-[10px] text-slate-600 block">sensib.</span>
+          </div>
         </div>
       </div>
 
-      {/* ════════════════════════════════════
-          FLUXO DE ANÁLISE — ABAS (PIPELINE)
-      ════════════════════════════════════ */}
-      <div className="mb-6 overflow-x-auto">
-        <div className="inline-flex gap-1.5 p-1.5 rounded-2xl glass min-w-max border border-white/10">
+      {/* TABS — Desktop apenas */}
+      <div className="mb-5 hidden md:block overflow-x-auto">
+        <div className="inline-flex gap-1.5 p-1.5 rounded-2xl glass min-w-max border border-white/8">
           {TABS.map(tab => (
             <button
               key={tab.key}
@@ -1388,15 +1361,27 @@ function StockPairAnalyzer() {
             >
               <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-black ${
                 activeTab === tab.key ? 'bg-slate-950/20 text-slate-950' : 'bg-white/5 text-slate-400'
-              }`}>
-                {tab.step}
-              </span>
+              }`}>{tab.step}</span>
               {tab.icon}
               <span>{tab.label}</span>
             </button>
           ))}
         </div>
       </div>
+
+      {/* BOTTOM NAV — Mobile apenas */}
+      <nav className="bottom-nav md:hidden">
+        {TABS.map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`bottom-nav-item ${activeTab === tab.key ? 'active' : ''}`}
+          >
+            <span className="[&>svg]:w-5 [&>svg]:h-5">{tab.icon}</span>
+            <span>{tab.label.split(' ')[0]}</span>
+          </button>
+        ))}
+      </nav>
 
       {/* ════════════════════════════════════
           TAB: RESUMO
@@ -1415,40 +1400,40 @@ function StockPairAnalyzer() {
             spreadValue={latestSpread}
           />
 
-          {/* 2. Cards das Cotações Lado a Lado */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Cards das cotações */}
+          <div className="grid grid-cols-2 gap-3">
             {/* Stock 1 Card */}
-            <div className="glass rounded-2xl p-6 border border-cyan-500/20 hover:border-cyan-500/40 transition-all">
-              <div className="flex items-center justify-between mb-4">
+            <div className="glass rounded-2xl p-4 sm:p-5 border border-cyan-500/20 hover:border-cyan-500/40 transition-all">
+              <div className="flex items-center justify-between mb-3">
                 <div>
-                  <span className="font-mono text-xl font-black text-cyan-400">{stock1Symbol}</span>
-                  <p className="text-xs text-slate-500 mt-0.5">{getStockName(stock1Symbol)}</p>
+                  <span className="font-mono text-lg sm:text-xl font-black text-cyan-400">{stock1Symbol}</span>
+                  <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5 leading-tight">{getStockName(stock1Symbol)}</p>
                 </div>
-                <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center">
-                  <TrendingUp className="w-5 h-5 text-cyan-400" />
+                <div className="w-8 h-8 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center">
+                  <TrendingUp className="w-4 h-4 text-cyan-400" />
                 </div>
               </div>
-              <div className="text-4xl font-black text-white font-mono">
+              <div className="text-2xl sm:text-3xl font-black text-white font-mono">
                 R$ {getLatestPrice(stock1Data).toFixed(2)}
               </div>
-              <div className="mt-3 text-xs text-slate-500">Preço mais recente no período ({dataSource})</div>
+              <div className="mt-2 text-[10px] sm:text-xs text-slate-500">Fechamento mais recente</div>
             </div>
 
             {/* Stock 2 Card */}
-            <div className="glass rounded-2xl p-6 border border-violet-500/20 hover:border-violet-500/40 transition-all">
-              <div className="flex items-center justify-between mb-4">
+            <div className="glass rounded-2xl p-4 sm:p-5 border border-violet-500/20 hover:border-violet-500/40 transition-all">
+              <div className="flex items-center justify-between mb-3">
                 <div>
-                  <span className="font-mono text-xl font-black text-violet-400">{stock2Symbol}</span>
-                  <p className="text-xs text-slate-500 mt-0.5">{getStockName(stock2Symbol)}</p>
+                  <span className="font-mono text-lg sm:text-xl font-black text-violet-400">{stock2Symbol}</span>
+                  <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5 leading-tight">{getStockName(stock2Symbol)}</p>
                 </div>
-                <div className="w-10 h-10 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
-                  <TrendingUp className="w-5 h-5 text-violet-400" />
+                <div className="w-8 h-8 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
+                  <TrendingUp className="w-4 h-4 text-violet-400" />
                 </div>
               </div>
-              <div className="text-4xl font-black text-white font-mono">
+              <div className="text-2xl sm:text-3xl font-black text-white font-mono">
                 R$ {getLatestPrice(stock2Data).toFixed(2)}
               </div>
-              <div className="mt-3 text-xs text-slate-500">Preço mais recente no período ({dataSource})</div>
+              <div className="mt-2 text-[10px] sm:text-xs text-slate-500">Fechamento mais recente</div>
             </div>
           </div>
 
