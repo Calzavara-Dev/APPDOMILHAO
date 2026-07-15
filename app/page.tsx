@@ -86,12 +86,18 @@ const alignSeriesByDate = (stock1: StockData[], stock2: StockData[]): { aligned1
   return { aligned1, aligned2 };
 };
 
-const generateSpreadData = (stock1: StockData[], stock2: StockData[]): SpreadData[] => {
+export type SpreadCalculationModel = 'ratio' | 'ols_beta' | 'simple';
+
+const generateSpreadData = (
+  stock1: StockData[],
+  stock2: StockData[],
+  model: SpreadCalculationModel = 'ratio'
+): SpreadData[] => {
   const { aligned1, aligned2 } = alignSeriesByDate(stock1, stock2);
   const n = Math.min(aligned1.length, aligned2.length);
   if (n === 0) return [];
 
-  // 1. Calcula Beta da Regressão OLS (P1 vs P2) para o resíduo cointegrado
+  // 1. Beta OLS para o modo Regressão
   let sum1 = 0, sum2 = 0;
   for (let i = 0; i < n; i++) {
     sum1 += aligned1[i].price;
@@ -109,11 +115,21 @@ const generateSpreadData = (stock1: StockData[], stock2: StockData[]): SpreadDat
   }
   const beta = var2 > 0 ? cov / var2 : 1;
 
-  // 2. Spread Cointegrado (Resíduo OLS: P1 - beta * P2)
+  // 2. Calcula Spread bruto conforme o modelo escolhido
   const rawSpreads: { date: string; spread: number }[] = [];
   let sumSpread = 0;
   for (let i = 0; i < n; i++) {
-    const spreadVal = aligned1[i].price - beta * aligned2[i].price;
+    const p1 = aligned1[i].price;
+    const p2 = aligned2[i].price || 1;
+    let spreadVal: number;
+    if (model === 'ratio') {
+      spreadVal = p1 / p2;
+    } else if (model === 'simple') {
+      spreadVal = p1 - p2;
+    } else {
+      // ols_beta
+      spreadVal = p1 - beta * p2;
+    }
     rawSpreads.push({ date: aligned1[i].date, spread: spreadVal });
     sumSpread += spreadVal;
   }
@@ -124,11 +140,11 @@ const generateSpreadData = (stock1: StockData[], stock2: StockData[]): SpreadDat
     varSpread += Math.pow(rawSpreads[i].spread - meanSpread, 2);
   }
   const stdDev = n > 1 ? Math.sqrt(varSpread / n) : 1;
-  const safeStdDev = stdDev > 0.0001 ? stdDev : 1;
+  const safeStdDev = stdDev > 0.000001 ? stdDev : 1;
 
   return rawSpreads.map(d => ({
     date: d.date,
-    spread: parseFloat(d.spread.toFixed(2)),
+    spread: parseFloat(model === 'ratio' ? d.spread.toFixed(4) : d.spread.toFixed(2)),
     zScore: parseFloat(((d.spread - meanSpread) / safeStdDev).toFixed(2))
   }));
 };
@@ -192,22 +208,22 @@ const calculateTopSpreads = (spreadData: SpreadData[]): TopSpread[] => {
 };
 
 // ─────────────────────────────────────────
-// BRAZILIAN STOCKS
+// BRAZILIAN STOCKS & PRESET PAIRS
 // ─────────────────────────────────────────
 const BRAZILIAN_STOCKS = [
-  { symbol: "PETR3", name: "Petrobras PN" }, { symbol: "PETR4", name: "Petrobras ON" },
-  { symbol: "VALE3", name: "Vale PN" }, { symbol: "ITUB3", name: "Itaú PN" },
-  { symbol: "ITUB4", name: "Itaú ON" }, { symbol: "BBDC3", name: "Bradesco PN" },
-  { symbol: "BBDC4", name: "Bradesco ON" }, { symbol: "SANB3", name: "Santander PN" },
-  { symbol: "SANB4", name: "Santander ON" }, { symbol: "BBAS3", name: "Banco do Brasil" },
-  { symbol: "BPAC3", name: "BTGP Banespa PN" }, { symbol: "BPAC5", name: "BTGP Banespa PNA" },
-  { symbol: "CSNA3", name: "CSN PN" }, { symbol: "USIM3", name: "Usiminas PN" },
-  { symbol: "USIM5", name: "Usiminas PNA" }, { symbol: "GOAU3", name: "Metalúrgica Gerdau PN" },
-  { symbol: "GOAU4", name: "Metalúrgica Gerdau ON" }, { symbol: "GGBR3", name: "Gerdau PN" },
-  { symbol: "GGBR4", name: "Gerdau ON" }, { symbol: "KLBN3", name: "Klabin PN" },
-  { symbol: "KLBN4", name: "Klabin ON" }, { symbol: "SUZB3", name: "Suzano PN" },
-  { symbol: "ELET3", name: "Eletrobras PN" }, { symbol: "ELET6", name: "Eletrobras PNB" },
-  { symbol: "CMIG3", name: "Cemig PN" }, { symbol: "CMIG4", name: "Cemig ON" },
+  { symbol: "PETR3", name: "Petrobras ON" }, { symbol: "PETR4", name: "Petrobras PN" },
+  { symbol: "VALE3", name: "Vale ON" }, { symbol: "ITUB3", name: "Itaú ON" },
+  { symbol: "ITUB4", name: "Itaú PN" }, { symbol: "BBDC3", name: "Bradesco ON" },
+  { symbol: "BBDC4", name: "Bradesco PN" }, { symbol: "SANB3", name: "Santander ON" },
+  { symbol: "SANB4", name: "Santander PN" }, { symbol: "BBAS3", name: "Banco do Brasil ON" },
+  { symbol: "BPAC3", name: "BTG Pactual ON" }, { symbol: "BPAC5", name: "BTG Pactual PNA" },
+  { symbol: "CSNA3", name: "CSN ON" }, { symbol: "USIM3", name: "Usiminas ON" },
+  { symbol: "USIM5", name: "Usiminas PNA" }, { symbol: "GOAU3", name: "Gerdau Met. ON" },
+  { symbol: "GOAU4", name: "Gerdau Met. PN" }, { symbol: "GGBR3", name: "Gerdau ON" },
+  { symbol: "GGBR4", name: "Gerdau PN" }, { symbol: "KLBN3", name: "Klabin ON" },
+  { symbol: "KLBN4", name: "Klabin PN" }, { symbol: "SUZB3", name: "Suzano ON" },
+  { symbol: "ELET3", name: "Eletrobras ON" }, { symbol: "ELET6", name: "Eletrobras PNB" },
+  { symbol: "CMIG3", name: "Cemig ON" }, { symbol: "CMIG4", name: "Cemig PN" },
   { symbol: "CPFE3", name: "CPFL Energia" }, { symbol: "RENT3", name: "Localiza" },
   { symbol: "VIVT3", name: "Telefônica Brasil" }, { symbol: "WEGE3", name: "WEG" },
   { symbol: "ABEV3", name: "Ambev" }, { symbol: "LREN3", name: "Lojas Renner" },
@@ -215,6 +231,19 @@ const BRAZILIAN_STOCKS = [
   { symbol: "PCAR3", name: "Pão de Açúcar" }, { symbol: "CIEL3", name: "Cielo" },
   { symbol: "JBSS3", name: "JBS" }, { symbol: "MRVE3", name: "MRV" },
   { symbol: "QUAL3", name: "Qualicorp" }, { symbol: "TIMS3", name: "TIM" },
+];
+
+const ON_PN_PAIRS = [
+  { s1: "PETR3", s2: "PETR4", label: "Petrobras (ON / PN)" },
+  { s1: "ITUB3", s2: "ITUB4", label: "Itaú Unibanco (ON / PN)" },
+  { s1: "BBDC3", s2: "BBDC4", label: "Bradesco (ON / PN)" },
+  { s1: "SANB3", s2: "SANB4", label: "Santander (ON / PN)" },
+  { s1: "GGBR3", s2: "GGBR4", label: "Gerdau (ON / PN)" },
+  { s1: "GOAU3", s2: "GOAU4", label: "Metalúrgica Gerdau (ON / PN)" },
+  { s1: "USIM3", s2: "USIM5", label: "Usiminas (ON / PNA)" },
+  { s1: "CMIG3", s2: "CMIG4", label: "Cemig (ON / PN)" },
+  { s1: "ELET3", s2: "ELET6", label: "Eletrobras (ON / PNB)" },
+  { s1: "KLBN3", s2: "KLBN4", label: "Klabin (ON / PN)" },
 ];
 
 // ─────────────────────────────────────────
@@ -464,6 +493,14 @@ function StockPairAnalyzer() {
 
   const [stock1Symbol, setStock1Symbol] = useState("PETR3");
   const [stock2Symbol, setStock2Symbol] = useState("PETR4");
+  const [spreadModel, setSpreadModel] = useState<SpreadCalculationModel>('ratio');
+
+  const formatSpreadValue = (val: number) => {
+    if (spreadModel === 'ratio') {
+      return `${val.toFixed(4)}x`;
+    }
+    return `R$ ${val.toFixed(2)}`;
+  };
   const [stock1Data, setStock1Data] = useState<StockData[]>([]);
   const [stock2Data, setStock2Data] = useState<StockData[]>([]);
   const [spreadData, setSpreadData] = useState<SpreadData[]>([]);
@@ -795,7 +832,7 @@ function StockPairAnalyzer() {
       setStock1Data(aligned1);
       setStock2Data(aligned2);
       setIsLoading(false);
-      const spread = generateSpreadData(aligned1, aligned2);
+      const spread = generateSpreadData(aligned1, aligned2, spreadModel);
       setSpreadData(spread);
       const latest = spread[spread.length - 1];
       setLatestSpread(latest.spread);
@@ -823,7 +860,7 @@ function StockPairAnalyzer() {
     fetchData();
     const interval = setInterval(fetchData, updateInterval);
     return () => clearInterval(interval);
-  }, [stock1Symbol, stock2Symbol, updateInterval, histBins, historyDays, brapiToken, zRanges]);
+  }, [stock1Symbol, stock2Symbol, updateInterval, histBins, historyDays, brapiToken, zRanges, spreadModel]);
 
   useEffect(() => {
     if (spreadData.length > 0 && stock1Data.length > 0 && stock2Data.length > 0) {
@@ -1012,7 +1049,7 @@ function StockPairAnalyzer() {
                 )}
               </div>
               <div className="mt-3 flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
-                <span className="text-3xl font-black font-mono text-white">R$ {latestSpread.toFixed(2)}</span>
+                <span className="text-3xl font-black font-mono text-white">{formatSpreadValue(latestSpread)}</span>
                 <span className="text-xs sm:text-sm font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
                   {resultadoCamadas.camadaAtualSugestao}
                 </span>
@@ -1266,10 +1303,61 @@ function StockPairAnalyzer() {
               </button>
             </div>
 
-            {/* Stock selectors */}
+            {/* Stock selectors and Spread Model */}
             <div className="flex flex-wrap items-center gap-2">
+              {/* Seletor Rápido de Pares Pré-selecionados da Mesma Empresa */}
+              <Select
+                value={`${stock1Symbol}_${stock2Symbol}`}
+                onValueChange={val => {
+                  const [s1, s2] = val.split('_');
+                  if (s1 && s2) {
+                    setStock1Symbol(s1);
+                    setStock2Symbol(s2);
+                  }
+                }}
+              >
+                <SelectTrigger className="w-[190px] bg-fin-surface1 border-cyan-500/30 text-cyan-300 font-semibold hover:border-cyan-400 transition-colors">
+                  <SelectValue placeholder="⚡ Pares ON/PN" />
+                </SelectTrigger>
+                <SelectContent>
+                  <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-white/10 mb-1">
+                    🎯 Mesma Empresa (ON / PN)
+                  </div>
+                  {ON_PN_PAIRS.map(p => (
+                    <SelectItem key={`${p.s1}_${p.s2}`} value={`${p.s1}_${p.s2}`}>
+                      <span className="font-mono font-bold text-cyan-400">{p.s1} / {p.s2}</span>
+                      <span className="ml-2 text-slate-400 text-xs">{p.label}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Seletor do Modelo de Cálculo do Spread */}
+              <Select value={spreadModel} onValueChange={v => setSpreadModel(v as SpreadCalculationModel)}>
+                <SelectTrigger className="w-[185px] bg-fin-surface1 border-violet-500/30 text-violet-300 font-semibold hover:border-violet-400 transition-colors" title="Modelo de Cálculo do Spread">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-white/10 mb-1">
+                    📐 Modelo de Spread
+                  </div>
+                  <SelectItem value="ratio">
+                    <span className="font-semibold text-violet-300">Razão (P1 / P2)</span>
+                    <span className="block text-[11px] text-slate-400">Padrão Ouro para ON/PN</span>
+                  </SelectItem>
+                  <SelectItem value="ols_beta">
+                    <span className="font-semibold text-cyan-300">Resíduo β (P1 - β·P2)</span>
+                    <span className="block text-[11px] text-slate-400">Padrão Cointegração</span>
+                  </SelectItem>
+                  <SelectItem value="simple">
+                    <span className="font-semibold text-emerald-300">Simples (P1 - P2)</span>
+                    <span className="block text-[11px] text-slate-400">Subtração Direta R$</span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+
               <Select value={stock1Symbol} onValueChange={v => setStock1Symbol(sanitizeSymbol(v))}>
-                <SelectTrigger className="w-[180px] bg-fin-surface1 border-white/10 text-slate-200 hover:border-cyan-500/50 transition-colors">
+                <SelectTrigger className="w-[140px] bg-fin-surface1 border-white/10 text-slate-200 hover:border-cyan-500/50 transition-colors">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1285,7 +1373,7 @@ function StockPairAnalyzer() {
               <div className="flex items-center gap-1 text-slate-500 font-bold text-sm">VS</div>
 
               <Select value={stock2Symbol} onValueChange={v => setStock2Symbol(sanitizeSymbol(v))}>
-                <SelectTrigger className="w-[180px] bg-fin-surface1 border-white/10 text-slate-200 hover:border-violet-500/50 transition-colors">
+                <SelectTrigger className="w-[140px] bg-fin-surface1 border-white/10 text-slate-200 hover:border-violet-500/50 transition-colors">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1381,7 +1469,7 @@ function StockPairAnalyzer() {
               </span>
             </div>
             <p className="text-xs font-semibold text-white mt-1">
-              {stock1Symbol} vs {stock2Symbol} — Spread atual: <strong className="font-mono text-cyan-300">R$ {latestSpread.toFixed(2)}</strong> ({latestZScore >= 0 ? "+" : ""}{latestZScore.toFixed(2)} σ)
+              {stock1Symbol} vs {stock2Symbol} — Spread atual: <strong className="font-mono text-cyan-300">{formatSpreadValue(latestSpread)}</strong> ({latestZScore >= 0 ? "+" : ""}{latestZScore.toFixed(2)} σ)
             </p>
           </div>
         </div>
@@ -2288,15 +2376,15 @@ function StockPairAnalyzer() {
                   <h3 className="text-xs font-bold text-violet-400 uppercase tracking-wider">🎯 Níveis de Controle de Risco</h3>
                   <div className="flex justify-between items-center py-1.5 border-b border-white/5">
                     <span className="text-xs text-slate-400">Spread Atual (Entrada)</span>
-                    <span className="font-mono font-bold text-white">R$ {latestSpread.toFixed(2)}</span>
+                    <span className="font-mono font-bold text-white">{formatSpreadValue(latestSpread)}</span>
                   </div>
                   <div className="flex justify-between items-center py-1.5 border-b border-white/5">
                     <span className="text-xs text-slate-400">🔴 Stop Loss (Spread)</span>
-                    <span className="font-mono font-bold text-red-400">R$ {stopLossResult.stopLossSpread.toFixed(2)}</span>
+                    <span className="font-mono font-bold text-red-400">{formatSpreadValue(stopLossResult.stopLossSpread)}</span>
                   </div>
                   <div className="flex justify-between items-center py-1.5 border-b border-white/5">
                     <span className="text-xs text-slate-400">🟢 Take Profit (Spread)</span>
-                    <span className="font-mono font-bold text-emerald-400">R$ {stopLossResult.takeProfitSpread.toFixed(2)}</span>
+                    <span className="font-mono font-bold text-emerald-400">{formatSpreadValue(stopLossResult.takeProfitSpread)}</span>
                   </div>
                   <div className="flex justify-between items-center py-1.5 border-b border-white/5">
                     <span className="text-xs text-slate-400">📊 Risk/Reward</span>
@@ -2446,7 +2534,7 @@ function StockPairAnalyzer() {
                       </div>
                       <div className="flex justify-between text-xs">
                         <span className="text-slate-400">Spread</span>
-                        <span className="font-mono text-white">R$ {latestSpread.toFixed(2)}</span>
+                        <span className="font-mono text-white">{formatSpreadValue(latestSpread)}</span>
                       </div>
                       <div className="flex justify-between text-xs">
                         <span className="text-slate-400">Correlação</span>
