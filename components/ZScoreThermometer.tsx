@@ -106,31 +106,31 @@ export function ZScoreThermometer({
         <div className="h-7 w-full rounded-full overflow-hidden flex shadow-inner border border-white/10">
           {/* Zona Verde - Compra (-3 a -1.5) -> 25% da barra */}
           <div className="w-1/4 bg-gradient-to-r from-emerald-600 to-emerald-500/60 flex items-center justify-center">
-            <span className="text-[11px] font-black text-white uppercase tracking-tighter drop-shadow">
-              🟢 Comprar
+            <span className="text-[9px] sm:text-[11px] font-black text-white uppercase tracking-tighter drop-shadow truncate px-1">
+              🟢 <span className="hidden sm:inline">Comprar</span><span className="sm:hidden">Comp.</span>
             </span>
           </div>
           {/* Zona Neutra (-1.5 a +1.5) -> 50% da barra */}
           <div className="w-2/4 bg-gradient-to-r from-slate-700 via-slate-600 to-slate-700 flex items-center justify-center border-x border-white/20">
-            <span className="text-[11px] font-bold text-slate-200 uppercase tracking-tighter">
-              ⚪ Normal / Equilíbrio (Média)
+            <span className="text-[9px] sm:text-[11px] font-bold text-slate-200 uppercase tracking-tighter truncate px-1">
+              ⚪ <span className="hidden sm:inline">Normal / Equilíbrio (Média)</span><span className="sm:hidden">Equilíbrio</span>
             </span>
           </div>
           {/* Zona Vermelha - Venda (+1.5 a +3) -> 25% da barra */}
           <div className="w-1/4 bg-gradient-to-r from-rose-500/60 to-rose-600 flex items-center justify-center">
-            <span className="text-[11px] font-black text-white uppercase tracking-tighter drop-shadow">
-              🔴 Vender
+            <span className="text-[9px] sm:text-[11px] font-black text-white uppercase tracking-tighter drop-shadow truncate px-1">
+              🔴 <span className="hidden sm:inline">Vender</span><span className="sm:hidden">Vend.</span>
             </span>
           </div>
         </div>
 
         {/* Escala Numérica abaixo da barra */}
-        <div className="flex justify-between text-[11px] font-mono font-bold text-slate-400 mt-2 px-1">
-          <span>-3.0 σ (Extremo)</span>
-          <span className="text-emerald-400">-1.5 σ (Entrada Long)</span>
-          <span className="text-white">0 (Média)</span>
-          <span className="text-rose-400">+1.5 σ (Entrada Short)</span>
-          <span>+3.0 σ (Extremo)</span>
+        <div className="flex justify-between text-[9px] sm:text-[11px] font-mono font-bold text-slate-400 mt-2 px-0.5 sm:px-1">
+          <span>-3.0 σ<span className="hidden sm:inline"> (Extremo)</span></span>
+          <span className="text-emerald-400">-1.5 σ<span className="hidden sm:inline"> (Entrada Long)</span></span>
+          <span className="text-white">0<span className="hidden sm:inline"> (Média)</span></span>
+          <span className="text-rose-400">+1.5 σ<span className="hidden sm:inline"> (Entrada Short)</span></span>
+          <span>+3.0 σ<span className="hidden sm:inline"> (Extremo)</span></span>
         </div>
       </div>
 
@@ -175,12 +175,12 @@ export function ZScoreThermometer({
         </div>
 
         {/* Indicador de Esticamento */}
-        <div className="flex items-center gap-3 bg-slate-950/50 px-4 py-2.5 rounded-xl border border-white/10 shrink-0">
-          <div className="text-right">
+        <div className="flex items-center justify-between sm:justify-start gap-3 bg-slate-950/50 px-4 py-2.5 rounded-xl border border-white/10 w-full md:w-auto shrink-0">
+          <div className="text-left md:text-right">
             <span className="text-[10px] uppercase font-bold text-slate-400 block">Nível de Esticamento</span>
             <span className="text-base font-black font-mono text-white">{stretchPct}%</span>
           </div>
-          <div className="w-14 bg-white/10 h-2.5 rounded-full overflow-hidden">
+          <div className="w-24 md:w-14 bg-white/10 h-2.5 rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full ${
                 stretchPct >= 60 ? (isBuy ? "bg-emerald-400" : "bg-rose-400") : "bg-cyan-400"

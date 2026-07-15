@@ -1304,125 +1304,133 @@ function StockPairAnalyzer() {
             </div>
 
             {/* Stock selectors and Spread Model */}
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full md:w-auto">
               {/* Seletor Rápido de Pares Pré-selecionados da Mesma Empresa */}
-              <Select
-                value={`${stock1Symbol}_${stock2Symbol}`}
-                onValueChange={val => {
-                  const [s1, s2] = val.split('_');
-                  if (s1 && s2) {
-                    setStock1Symbol(s1);
-                    setStock2Symbol(s2);
-                  }
-                }}
-              >
-                <SelectTrigger className="w-[190px] bg-fin-surface1 border-cyan-500/30 text-cyan-300 font-semibold hover:border-cyan-400 transition-colors">
-                  <SelectValue placeholder="⚡ Pares ON/PN" />
-                </SelectTrigger>
-                <SelectContent>
-                  <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-white/10 mb-1">
-                    🎯 Mesma Empresa (ON / PN)
-                  </div>
-                  {ON_PN_PAIRS.map(p => (
-                    <SelectItem key={`${p.s1}_${p.s2}`} value={`${p.s1}_${p.s2}`}>
-                      <span className="font-mono font-bold text-cyan-400">{p.s1} / {p.s2}</span>
-                      <span className="ml-2 text-slate-400 text-xs">{p.label}</span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="col-span-2 sm:col-span-1 w-full sm:w-auto">
+                <Select
+                  value={`${stock1Symbol}_${stock2Symbol}`}
+                  onValueChange={val => {
+                    const [s1, s2] = val.split('_');
+                    if (s1 && s2) {
+                      setStock1Symbol(s1);
+                      setStock2Symbol(s2);
+                    }
+                  }}
+                >
+                  <SelectTrigger className="w-full sm:w-[190px] bg-fin-surface1 border-cyan-500/30 text-cyan-300 font-semibold hover:border-cyan-400 transition-colors">
+                    <SelectValue placeholder="⚡ Pares ON/PN" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-white/10 mb-1">
+                      🎯 Mesma Empresa (ON / PN)
+                    </div>
+                    {ON_PN_PAIRS.map(p => (
+                      <SelectItem key={`${p.s1}_${p.s2}`} value={`${p.s1}_${p.s2}`}>
+                        <span className="font-mono font-bold text-cyan-400">{p.s1} / {p.s2}</span>
+                        <span className="ml-2 text-slate-400 text-xs">{p.label}</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
               {/* Seletor do Modelo de Cálculo do Spread */}
-              <Select value={spreadModel} onValueChange={v => setSpreadModel(v as SpreadCalculationModel)}>
-                <SelectTrigger className="w-[185px] bg-fin-surface1 border-violet-500/30 text-violet-300 font-semibold hover:border-violet-400 transition-colors" title="Modelo de Cálculo do Spread">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-white/10 mb-1">
-                    📐 Modelo de Spread
-                  </div>
-                  <SelectItem value="ratio">
-                    <span className="font-semibold text-violet-300">Razão (P1 / P2)</span>
-                    <span className="block text-[11px] text-slate-400">Padrão Ouro para ON/PN</span>
-                  </SelectItem>
-                  <SelectItem value="ols_beta">
-                    <span className="font-semibold text-cyan-300">Resíduo β (P1 - β·P2)</span>
-                    <span className="block text-[11px] text-slate-400">Padrão Cointegração</span>
-                  </SelectItem>
-                  <SelectItem value="simple">
-                    <span className="font-semibold text-emerald-300">Simples (P1 - P2)</span>
-                    <span className="block text-[11px] text-slate-400">Subtração Direta R$</span>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={stock1Symbol} onValueChange={v => setStock1Symbol(sanitizeSymbol(v))}>
-                <SelectTrigger className="w-[140px] bg-fin-surface1 border-white/10 text-slate-200 hover:border-cyan-500/50 transition-colors">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {BRAZILIAN_STOCKS.map(s => (
-                    <SelectItem key={s.symbol} value={s.symbol}>
-                      <span className="font-mono font-semibold text-cyan-400">{s.symbol}</span>
-                      <span className="ml-2 text-slate-400 text-xs">{s.name}</span>
+              <div className="col-span-2 sm:col-span-1 w-full sm:w-auto">
+                <Select value={spreadModel} onValueChange={v => setSpreadModel(v as SpreadCalculationModel)}>
+                  <SelectTrigger className="w-full sm:w-[185px] bg-fin-surface1 border-violet-500/30 text-violet-300 font-semibold hover:border-violet-400 transition-colors" title="Modelo de Cálculo do Spread">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-white/10 mb-1">
+                      📐 Modelo de Spread
+                    </div>
+                    <SelectItem value="ratio">
+                      <span className="font-semibold text-violet-300">Razão (P1 / P2)</span>
+                      <span className="block text-[11px] text-slate-400">Padrão Ouro para ON/PN</span>
                     </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <div className="flex items-center gap-1 text-slate-500 font-bold text-sm">VS</div>
-
-              <Select value={stock2Symbol} onValueChange={v => setStock2Symbol(sanitizeSymbol(v))}>
-                <SelectTrigger className="w-[140px] bg-fin-surface1 border-white/10 text-slate-200 hover:border-violet-500/50 transition-colors">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {BRAZILIAN_STOCKS.filter(s => s.symbol !== stock1Symbol).map(s => (
-                    <SelectItem key={s.symbol} value={s.symbol}>
-                      <span className="font-mono font-semibold text-violet-400">{s.symbol}</span>
-                      <span className="ml-2 text-slate-400 text-xs">{s.name}</span>
+                    <SelectItem value="ols_beta">
+                      <span className="font-semibold text-cyan-300">Resíduo β (P1 - β·P2)</span>
+                      <span className="block text-[11px] text-slate-400">Padrão Cointegração</span>
                     </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                    <SelectItem value="simple">
+                      <span className="font-semibold text-emerald-300">Simples (P1 - P2)</span>
+                      <span className="block text-[11px] text-slate-400">Subtração Direta R$</span>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-              <button
-                onClick={() => setShowSettingsModal(true)}
-                className="w-9 h-9 rounded-xl glass hover:border-white/20 transition-all flex items-center justify-center text-slate-400 hover:text-slate-200"
-                aria-label="Configurações"
-              >
-                <Settings className="w-4 h-4" />
-              </button>
+              <div className="col-span-2 flex flex-wrap sm:flex-nowrap items-center gap-2 w-full sm:w-auto">
+                <Select value={stock1Symbol} onValueChange={v => setStock1Symbol(sanitizeSymbol(v))}>
+                  <SelectTrigger className="flex-1 min-w-[120px] sm:w-[140px] bg-fin-surface1 border-white/10 text-slate-200 hover:border-cyan-500/50 transition-colors">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {BRAZILIAN_STOCKS.map(s => (
+                      <SelectItem key={s.symbol} value={s.symbol}>
+                        <span className="font-mono font-semibold text-cyan-400">{s.symbol}</span>
+                        <span className="ml-2 text-slate-400 text-xs">{s.name}</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
-              {/* Dark / Light Mode Toggle */}
-              <button
-                onClick={() => setIsDark(d => !d)}
-                className="w-9 h-9 rounded-xl glass hover:border-white/20 transition-all flex items-center justify-center text-slate-400 hover:text-amber-400"
-                aria-label={isDark ? 'Ativar modo claro' : 'Ativar modo escuro'}
-                title={isDark ? 'Modo Claro' : 'Modo Escuro'}
-              >
-                {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-              </button>
+                <div className="flex items-center gap-1 text-slate-500 font-bold text-sm px-1">VS</div>
 
-              {/* Notificações */}
-              <button
-                onClick={async () => {
-                  const perm = await requestPermission();
-                  setNotifPermission(perm);
-                }}
-                className={`w-9 h-9 rounded-xl glass transition-all flex items-center justify-center ${
-                  notifPermission === 'granted'
-                    ? 'text-emerald-400 border-emerald-500/30'
-                    : notifPermission === 'denied'
-                    ? 'text-red-400 border-red-500/20 opacity-50 cursor-not-allowed'
-                    : 'text-slate-400 hover:text-cyan-400 hover:border-white/20'
-                }`}
-                aria-label="Alertas"
-                title={notifPermission === 'granted' ? 'Alertas ativos' : notifPermission === 'denied' ? 'Alertas bloqueados' : 'Ativar alertas'}
-                disabled={notifPermission === 'denied'}
-              >
-                {notifPermission === 'granted' ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
-              </button>
+                <Select value={stock2Symbol} onValueChange={v => setStock2Symbol(sanitizeSymbol(v))}>
+                  <SelectTrigger className="flex-1 min-w-[120px] sm:w-[140px] bg-fin-surface1 border-white/10 text-slate-200 hover:border-violet-500/50 transition-colors">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {BRAZILIAN_STOCKS.filter(s => s.symbol !== stock1Symbol).map(s => (
+                      <SelectItem key={s.symbol} value={s.symbol}>
+                        <span className="font-mono font-semibold text-violet-400">{s.symbol}</span>
+                        <span className="ml-2 text-slate-400 text-xs">{s.name}</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <div className="flex items-center gap-1.5 ml-auto sm:ml-0 mt-2 sm:mt-0">
+                  <button
+                    onClick={() => setShowSettingsModal(true)}
+                    className="w-9 h-9 rounded-xl glass hover:border-white/20 transition-all flex items-center justify-center text-slate-400 hover:text-slate-200"
+                    aria-label="Configurações"
+                  >
+                    <Settings className="w-4 h-4" />
+                  </button>
+
+                  {/* Dark / Light Mode Toggle */}
+                  <button
+                    onClick={() => setIsDark(d => !d)}
+                    className="w-9 h-9 rounded-xl glass hover:border-white/20 transition-all flex items-center justify-center text-slate-400 hover:text-amber-400"
+                    aria-label={isDark ? 'Ativar modo claro' : 'Ativar modo escuro'}
+                    title={isDark ? 'Modo Claro' : 'Modo Escuro'}
+                  >
+                    {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                  </button>
+
+                  {/* Notificações */}
+                  <button
+                    onClick={async () => {
+                      const perm = await requestPermission();
+                      setNotifPermission(perm);
+                    }}
+                    className={`w-9 h-9 rounded-xl glass transition-all flex items-center justify-center ${
+                      notifPermission === 'granted'
+                        ? 'text-emerald-400 border-emerald-500/30'
+                        : notifPermission === 'denied'
+                        ? 'text-red-400 border-red-500/20 opacity-50 cursor-not-allowed'
+                        : 'text-slate-400 hover:text-cyan-400 hover:border-white/20'
+                    }`}
+                    aria-label="Alertas"
+                    title={notifPermission === 'granted' ? 'Alertas ativos' : notifPermission === 'denied' ? 'Alertas bloqueados' : 'Ativar alertas'}
+                    disabled={notifPermission === 'denied'}
+                  >
+                    {notifPermission === 'granted' ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1475,18 +1483,18 @@ function StockPairAnalyzer() {
         </div>
 
         {/* Lado direito: 4 KPIs essenciais compactos + Ação */}
-        <div className="flex items-center gap-3 flex-wrap xl:flex-nowrap w-full xl:w-auto justify-between xl:justify-end">
-          <div className="flex items-center gap-4 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs">
+        <div className="flex items-center gap-3 flex-wrap xl:flex-nowrap w-full xl:w-auto justify-between xl:justify-end mt-2 xl:mt-0">
+          <div className="flex items-center justify-between sm:justify-start gap-3 sm:gap-4 px-3 sm:px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs w-full sm:w-auto overflow-x-auto">
             <div>
               <span className="text-slate-400 block text-[10px] uppercase font-bold">Correlação</span>
               <span className="font-mono font-bold text-white">{(pairStats.correlation * 100).toFixed(0)}% (R² {pairStats.rSquared})</span>
             </div>
-            <div className="w-px h-6 bg-white/10" />
+            <div className="w-px h-6 bg-white/10 shrink-0" />
             <div>
               <span className="text-slate-400 block text-[10px] uppercase font-bold">Meia-Vida</span>
               <span className="font-mono font-bold text-violet-300">~{pairStats.halfLifeDays} dias</span>
             </div>
-            <div className="w-px h-6 bg-white/10" />
+            <div className="w-px h-6 bg-white/10 shrink-0" />
             <div>
               <span className="text-slate-400 block text-[10px] uppercase font-bold">Beta</span>
               <span className="font-mono font-bold text-cyan-300">{pairStats.beta}</span>
@@ -1495,7 +1503,7 @@ function StockPairAnalyzer() {
 
           <button
             onClick={handleCopyReport}
-            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-cyan-500 to-violet-500 text-slate-950 hover:opacity-90 transition-all shadow-lg shadow-cyan-500/20 shrink-0"
+            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-cyan-500 to-violet-500 text-slate-950 hover:opacity-90 transition-all shadow-lg shadow-cyan-500/20 shrink-0 w-full sm:w-auto"
           >
             {copiedReport ? (
               <>
