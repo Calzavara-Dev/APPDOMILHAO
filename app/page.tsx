@@ -28,11 +28,11 @@ import {
 } from "lucide-react";
 import {
   calculatePairStats, generateOperationalReport, type PairStats,
-  calculateStopLossTakeProfit, runBacktest, type StopLossResult, type BacktestResult
+  calculateStopLossTakeProfit, runBacktest, runLayerBacktest, type StopLossResult, type BacktestResult
 } from "@/lib/quantMetrics";
 import { saveSignal, loadSignals, clearSignals, type SignalRecord } from "@/lib/signalHistory";
 import {
-  getNotifPermission, requestPermission, checkAndNotify, type NotifPermission
+  getNotifPermission, requestPermission, checkAndNotify, playAlertAudio, type NotifPermission
 } from "@/lib/pushNotification";
 import { ZScoreThermometer } from "@/components/ZScoreThermometer";
 import { StockIcon } from "@/components/StockIcon";
@@ -565,6 +565,8 @@ function StockPairAnalyzer() {
   const [stopLossResult, setStopLossResult] = useState<StopLossResult | null>(null);
 
   // ── Backtest ──
+  const [backtestMode, setBacktestMode] = useState<'layers' | 'zscore'>('layers');
+  const [dataCalculationMode, setDataCalculationMode] = useState<'daily_close' | 'intraday_live'>('intraday_live');
   const [backtestZEntry, setBacktestZEntry] = useState<number>(1.5);
   const [backtestZExit, setBacktestZExit] = useState<number>(0.3);
   const [backtestResult, setBacktestResult] = useState<BacktestResult | null>(null);
@@ -663,20 +665,28 @@ function StockPairAnalyzer() {
 
   // ── Auto-salvar sinal quando signal muda (não NEUTRAL) ──
   useEffect(() => {
-    if (signal !== 'NEUTRAL' && latestSpread !== 0) {
-      saveSignal({
-        pair: `${stock1Symbol}/${stock2Symbol}`,
-        signal,
-        spread: latestSpread,
-        zScore: latestZScore,
-        camadaSugestao: resultadoCamadas?.camadaAtualSugestao,
-      });
-      setSignalHistory(loadSignals());
-      // Verifica notificação granular por camada
-      checkAndNotify(`${stock1Symbol}/${stock2Symbol}`, latestZScore, operationMode);
+    if (latestSpread !== 0 && spreadData.length > 0) {
+      if (signal !== 'NEUTRAL') {
+        saveSignal({
+          pair: `${stock1Symbol}/${stock2Symbol}`,
+          signal,
+          spread: latestSpread,
+          zScore: latestZScore,
+          camadaSugestao: resultadoCamadas?.camadaAtualSugestao,
+        });
+        setSignalHistory(loadSignals());
+      }
+      // Verifica notificação granular por camada sempre que o Z-Score ou a camada mudar
+      checkAndNotify(
+        `${stock1Symbol}/${stock2Symbol}`,
+        latestZScore,
+        operationMode,
+        resultadoCamadas,
+        latestSpread
+      );
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [signal, stock1Symbol, stock2Symbol, operationMode]);
+  }, [signal, resultadoCamadas?.camadaAtualIndex, stock1Symbol, stock2Symbol, operationMode]);
 
   // ── Calculadora Stop Loss / Sizing ──
   const handleCalculateSizing = useCallback(() => {
@@ -698,9 +708,22 @@ function StockPairAnalyzer() {
   // ── Backtest ──
   const handleRunBacktest = useCallback(() => {
     if (spreadData.length < 5) return;
-    const result = runBacktest(spreadData, backtestZEntry, backtestZExit);
+    let result: BacktestResult;
+    if (backtestMode === 'layers' && resultadoCamadas) {
+      result = runLayerBacktest(
+        spreadData,
+        resultadoCamadas.spreadMin,
+        resultadoCamadas.spreadMax,
+        resultadoCamadas.picoSpreadCenter,
+        operationMode,
+        stock1Symbol,
+        stock2Symbol
+      );
+    } else {
+      result = runBacktest(spreadData, backtestZEntry, backtestZExit, operationMode, stock1Symbol, stock2Symbol);
+    }
     setBacktestResult(result);
-  }, [spreadData, backtestZEntry, backtestZExit]);
+  }, [spreadData, backtestMode, backtestZEntry, backtestZExit, resultadoCamadas, operationMode, stock1Symbol, stock2Symbol]);
 
   useEffect(() => {
     if (spreadData.length > 0) handleRunBacktest();
@@ -743,18 +766,19 @@ function StockPairAnalyzer() {
         const cached = cacheRef.current[cacheKey];
         if (cached && now - cached.ts < cacheTTL) return cached.data;
 
-        // Mapear período histórico para range da brapi (suporta 1 ano e além)
+        // Mapear período histórico para range da brapi (suporta até 10 anos e além)
         const getRange = (days: number) => {
           if (days <= 22) return '1mo';
           if (days <= 66) return '3mo';
           if (days <= 130) return '6mo';
           if (days <= 260) return '1y';
           if (days <= 520) return '2y';
-          return '5y';
+          if (days <= 1300) return '5y';
+          return '10y';
         };
 
-        // Lista de fallbacks de ranges: se a API retornar erro 400 por limitação de plano no range maior (ex: 1y), tenta automatico os ranges menores (6mo, 3mo, 1mo) antes de falhar
-        const fallbackOrder = ['5y', '2y', '1y', '6mo', '3mo', '1mo'];
+        // Lista de fallbacks de ranges: se a API retornar erro 400 por limitação de plano no range maior, tenta ranges menores
+        const fallbackOrder = ['10y', '5y', '2y', '1y', '6mo', '3mo', '1mo'];
         const initialRange = getRange(historyDays);
         const rangesToTry = [initialRange];
         const initialIdx = fallbackOrder.indexOf(initialRange);
@@ -830,20 +854,38 @@ function StockPairAnalyzer() {
       }
 
       // Fetch live quote for real-time price display
+      let q1Val: number | null = null;
+      let q2Val: number | null = null;
       if (usedReal) {
         const [q1, q2] = await Promise.all([fetchLiveQuote(stock1Symbol), fetchLiveQuote(stock2Symbol)]);
-        if (q1) { setLivePrice1(q1.regularMarketPrice); setLiveChange1(q1.regularMarketChangePercent); }
-        if (q2) { setLivePrice2(q2.regularMarketPrice); setLiveChange2(q2.regularMarketChangePercent); }
+        if (q1) { setLivePrice1(q1.regularMarketPrice); setLiveChange1(q1.regularMarketChangePercent); q1Val = q1.regularMarketPrice; }
+        if (q2) { setLivePrice2(q2.regularMarketPrice); setLiveChange2(q2.regularMarketChangePercent); q2Val = q2.regularMarketPrice; }
       } else {
         setLivePrice1(null); setLivePrice2(null); setLiveChange1(null); setLiveChange2(null);
       }
 
       const { aligned1, aligned2 } = alignSeriesByDate(stock1, stock2);
+      let finalAligned1 = aligned1;
+      let finalAligned2 = aligned2;
+      if (dataCalculationMode === 'intraday_live' && q1Val && q2Val && aligned1.length > 0 && aligned2.length > 0) {
+        const todayStr = new Date().toISOString().split('T')[0];
+        finalAligned1 = [...aligned1];
+        finalAligned2 = [...aligned2];
+        const lastIdx = finalAligned1.length - 1;
+        if (finalAligned1[lastIdx].date === todayStr) {
+          finalAligned1[lastIdx] = { date: todayStr, price: q1Val };
+          finalAligned2[lastIdx] = { date: todayStr, price: q2Val };
+        } else {
+          finalAligned1.push({ date: todayStr, price: q1Val });
+          finalAligned2.push({ date: todayStr, price: q2Val });
+        }
+      }
+
       setDataSource(usedReal ? "real" : "simulado");
-      setStock1Data(aligned1);
-      setStock2Data(aligned2);
+      setStock1Data(finalAligned1);
+      setStock2Data(finalAligned2);
       setIsLoading(false);
-      const spread = generateSpreadData(aligned1, aligned2, spreadModel);
+      const spread = generateSpreadData(finalAligned1, finalAligned2, spreadModel);
       setSpreadData(spread);
       const latest = spread[spread.length - 1];
       setLatestSpread(latest.spread);
@@ -864,14 +906,17 @@ function StockPairAnalyzer() {
         setRangeLines(lines);
       } else setRangeLines([]);
       setHistogramData(generateHistogramData(spread, histBins));
-      setDistributionStats(calculateDistributionStats(spread, aligned1, aligned2));
+      setDistributionStats(calculateDistributionStats(spread, finalAligned1, finalAligned2));
       setTopSpreads(calculateTopSpreads(spread));
     };
 
     fetchData();
-    const interval = setInterval(fetchData, updateInterval);
-    return () => clearInterval(interval);
-  }, [stock1Symbol, stock2Symbol, updateInterval, histBins, historyDays, brapiToken, zRanges, spreadModel]);
+    let interval: any = null;
+    if (updateInterval > 0) {
+      interval = setInterval(fetchData, updateInterval);
+    }
+    return () => { if (interval) clearInterval(interval); };
+  }, [stock1Symbol, stock2Symbol, updateInterval, histBins, historyDays, brapiToken, zRanges, spreadModel, dataCalculationMode]);
 
   useEffect(() => {
     if (spreadData.length > 0 && stock1Data.length > 0 && stock2Data.length > 0) {
@@ -1627,6 +1672,7 @@ function StockPairAnalyzer() {
             spreadValue={latestSpread}
             logoUrl1={logoMap[stock1Symbol]}
             logoUrl2={logoMap[stock2Symbol]}
+            operationMode={operationMode}
           />
 
           {/* 2. Cards das Cotações Lado a Lado */}
@@ -1975,11 +2021,13 @@ function StockPairAnalyzer() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value={APP_CONFIG.TIMING.UPDATE_INTERVALS.MANUAL.toString()}>Apenas Fechamento / Manual</SelectItem>
                       <SelectItem value={APP_CONFIG.TIMING.UPDATE_INTERVALS.FAST.toString()}>30s</SelectItem>
                       <SelectItem value={APP_CONFIG.TIMING.UPDATE_INTERVALS.REALTIME.toString()}>60s</SelectItem>
                       <SelectItem value={APP_CONFIG.TIMING.UPDATE_INTERVALS.MEDIUM.toString()}>2min</SelectItem>
                       <SelectItem value={APP_CONFIG.TIMING.UPDATE_INTERVALS.SLOW.toString()}>5min</SelectItem>
                       <SelectItem value={APP_CONFIG.TIMING.UPDATE_INTERVALS.HOURLY.toString()}>1h</SelectItem>
+                      <SelectItem value={APP_CONFIG.TIMING.UPDATE_INTERVALS.DAILY.toString()}>24h (Diário)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1990,9 +2038,9 @@ function StockPairAnalyzer() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {[30, 60, 90, 120, 150, 180, 252, 365].map(d => (
+                      {[30, 60, 90, 120, 150, 180, 252, 365, 504, 1260, 2520].map(d => (
                         <SelectItem key={d} value={d.toString()}>
-                          {d === 252 ? '252 dias (1 ano pregões)' : d === 365 ? '365 dias (1 ano)' : `${d} dias`}
+                          {d === 252 ? '252 dias (1 ano pregões)' : d === 365 ? '365 dias (1 ano)' : d === 504 ? '504 dias (2 anos pregões)' : d === 1260 ? '1260 dias (5 anos pregões)' : d === 2520 ? '2520 dias (10 anos / Máx)' : `${d} dias`}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -2237,6 +2285,58 @@ function StockPairAnalyzer() {
             </div>
           </div>
 
+          {/* Configuração de Dados & Alerta Sonoro */}
+          <div className="glass rounded-2xl p-6 border border-white/5 space-y-4">
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <Zap className="w-4 h-4 text-cyan-400" /> Modo de Dados do Pregão & Alertas
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+              <div>
+                <label className="text-xs text-slate-400 mb-2 block font-bold">Ocorrência Durante o Pregão</label>
+                <Select value={dataCalculationMode} onValueChange={v => setDataCalculationMode(v as 'daily_close' | 'intraday_live')}>
+                  <SelectTrigger className="bg-fin-surface1 border-white/10 text-slate-200">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="intraday_live">
+                      <span className="font-semibold text-emerald-300">🟢 Cotação em Tempo Real + Fechamento</span>
+                      <span className="block text-[11px] text-slate-400">Atualiza spread e camadas com o preço ao vivo</span>
+                    </SelectItem>
+                    <SelectItem value="daily_close">
+                      <span className="font-semibold text-slate-300">⚪ Apenas Fechamentos do Dia (1d)</span>
+                      <span className="block text-[11px] text-slate-400">Ignora oscilações intraday até fechar o pregão</span>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-xs text-slate-400 block font-bold">Alerta Sonoro (Reversão de Camada)</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => playAlertAudio()}
+                    className="px-4 py-2 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-bold transition-all flex items-center gap-2"
+                  >
+                    🔔 Testar Alerta Sonoro
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const perm = await requestPermission();
+                      setNotifPermission(perm);
+                      if (perm === 'granted') {
+                        checkAndNotify(`${stock1Symbol}/${stock2Symbol}`, latestZScore, operationMode, resultadoCamadas, latestSpread);
+                      }
+                    }}
+                    className="px-4 py-2 rounded-xl bg-violet-500/10 hover:bg-violet-500/20 text-violet-300 border border-violet-500/30 text-xs font-bold transition-all flex items-center gap-2"
+                  >
+                    📲 Ativar Push Notif.
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Footer do Modal */}
           <div className="flex justify-end pt-4 border-t border-white/10">
             <button
@@ -2256,31 +2356,61 @@ function StockPairAnalyzer() {
       {activeTab === 'backtest' && (
         <div className="space-y-6 animate-fade-in">
           {/* Config do Backtest */}
-          <div className="glass rounded-2xl p-5 border border-white/10 flex flex-wrap gap-4 items-end">
-            <div>
-              <label className="text-xs text-slate-400 block mb-1.5">Entrada (Z-Score ±)</label>
-              <input
-                type="number" step="0.1" min="0.5" max="3"
-                value={backtestZEntry}
-                onChange={e => setBacktestZEntry(Number(e.target.value))}
-                className="input-dark w-24 text-center font-mono"
-              />
+          <div className="glass rounded-2xl p-5 border border-white/10 flex flex-wrap gap-4 items-end justify-between">
+            <div className="flex flex-wrap gap-4 items-end">
+              <div>
+                <label className="text-xs text-slate-400 block mb-1.5 font-bold">Modo de Simulação do Backtest</label>
+                <Select value={backtestMode} onValueChange={v => setBacktestMode(v as 'layers' | 'zscore')}>
+                  <SelectTrigger className="w-full sm:w-[280px] bg-fin-surface1 border-cyan-500/30 text-cyan-300 font-semibold">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="layers">
+                      <span className="font-semibold text-cyan-300">🔄 Sincronizado c/ Grade Gaussiana</span>
+                      <span className="block text-[11px] text-slate-400">Entrada nos Extremos e Saída na Moda</span>
+                    </SelectItem>
+                    <SelectItem value="zscore">
+                      <span className="font-semibold text-violet-300">⚡ Por Z-Score Manual (±σ)</span>
+                      <span className="block text-[11px] text-slate-400">Gatilhos customizados de Z-Score</span>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {backtestMode === 'zscore' ? (
+                <>
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1.5">Entrada (Z-Score ±)</label>
+                    <input
+                      type="number" step="0.1" min="0.5" max="3"
+                      value={backtestZEntry}
+                      onChange={e => setBacktestZEntry(Number(e.target.value))}
+                      className="input-dark w-24 text-center font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1.5">Saída (Z-Score ±)</label>
+                    <input
+                      type="number" step="0.1" min="0" max="1.5"
+                      value={backtestZExit}
+                      onChange={e => setBacktestZExit(Number(e.target.value))}
+                      className="input-dark w-24 text-center font-mono"
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className="p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-xs text-cyan-200 max-w-lg">
+                  💡 Simulação baseada na <strong>Distribuição de Frequência ({bandaFreqPercent}%)</strong>: Entrada acumulada quando o spread atinge os extremos da grade (Min: R$ {resultadoCamadas?.spreadMin.toFixed(2) ?? '---'} / Max: R$ {resultadoCamadas?.spreadMax.toFixed(2) ?? '---'}) e reversão de saída na Moda Central (R$ {resultadoCamadas?.picoSpreadCenter.toFixed(2) ?? '---'}).
+                </div>
+              )}
             </div>
-            <div>
-              <label className="text-xs text-slate-400 block mb-1.5">Saída (Z-Score ±)</label>
-              <input
-                type="number" step="0.1" min="0" max="1.5"
-                value={backtestZExit}
-                onChange={e => setBacktestZExit(Number(e.target.value))}
-                className="input-dark w-24 text-center font-mono"
-              />
-            </div>
+
             <button
               onClick={handleRunBacktest}
-              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-violet-500 text-slate-950 text-sm font-bold hover:opacity-90 transition-all shadow-lg shadow-cyan-500/20 flex items-center gap-2"
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-violet-500 text-slate-950 text-sm font-bold hover:opacity-90 transition-all shadow-lg shadow-cyan-500/20 flex items-center gap-2 shrink-0"
             >
               <FlaskConical className="w-4 h-4" />
-              Rodar Backtest
+              Recalcular Backtest
             </button>
           </div>
 
@@ -2527,8 +2657,9 @@ function StockPairAnalyzer() {
                       <span className="text-xs text-slate-400 ml-1">R$ por período</span>
                     </div>
                     <p className="text-[11px] text-slate-400 self-center max-w-md">
-                      O ATR mede o range médio de oscilação do spread por período. Ele define o buffer de proteção do stop loss
-                      (1.5× ATR além do spread atual) e calibra o sizing para absorver a volatilidade normal sem acionar paradas prematuras.
+                      {operationMode === 'custody_swap'
+                        ? 'O ATR mede o range médio de oscilação do spread por período. Em Troca de Custódia, ele ajuda a definir a distância ideal entre as camadas de acumulação (grid) para absorver a volatilidade natural sem pressa, aguardando a reversão à média.'
+                        : 'O ATR mede o range médio de oscilação do spread por período. Ele define o buffer de proteção do stop loss (1.5× ATR além do spread atual) e calibra o sizing para absorver a volatilidade normal sem acionar paradas prematuras.'}
                     </p>
                   </div>
                 </div>

@@ -15,6 +15,7 @@ export const APP_CONFIG = {
     HISTORICAL_PERIOD: {
       DAYS: 252,               // Quantos dias de histórico analisar (1 ano útil B3 ~ 252 pregões)
       MIN_DAYS: 30,            // Mínimo de dias necessários
+      MAX_DAYS: 2520,          // Máximo de dias de busca (10 anos de pregões úteis)
     },
 
     // Configurações de spread
@@ -28,11 +29,13 @@ export const APP_CONFIG = {
   TIMING: {
     // Intervalos de atualização
     UPDATE_INTERVALS: {
-      REALTIME: 60000,         // Atualização em tempo real (60 segundos)
+      MANUAL: 0,               // Apenas no Fechamento / Atualização Manual (0s)
       FAST: 30000,            // Atualização rápida (30s)
+      REALTIME: 60000,         // Atualização em tempo real (60 segundos)
       MEDIUM: 120000,         // Atualização média (2 min)
       SLOW: 300000,           // Atualização lenta (5 min)
       HOURLY: 3600000,        // Atualização a cada 1 hora
+      DAILY: 86400000,        // Atualização para fechamentos do dia (24h)
       HISTORICAL: 300000,     // Atualização histórica (5 minutos)
       ALERT_CHECK: 10000,     // Verificação de alertas (10 segundos)
     },

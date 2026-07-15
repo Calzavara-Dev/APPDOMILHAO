@@ -43,18 +43,61 @@ export function sendNotification(
 }
 
 /**
+ * Toca alerta sonoro configurado (quando acionado em camada ou teste)
+ */
+export function playAlertAudio(volume = 0.7): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const audio = new Audio("https://assets.mixkit.co/sfx/preview/mixkit-alarm-digital-clock-beep-989.mp3");
+    audio.volume = volume;
+    audio.play().catch(() => { /* Navegador pode requerer interação prévia */ });
+  } catch { }
+}
+
+/**
  * Verifica se uma camada gaussiana foi atingida e dispara notificação adaptada ao modo operacional
  */
 export function checkAndNotify(
   pair: string,
   zScore: number,
-  operationMode: 'custody_swap' | 'traditional_ls' = 'custody_swap'
+  operationMode: 'custody_swap' | 'traditional_ls' = 'custody_swap',
+  resultadoCamadas?: any,
+  latestSpread?: number
 ): void {
   const absZ = Math.abs(zScore);
   const signStr = zScore >= 0 ? '+' : '';
   const [s1, s2] = pair.split('_').length === 2 ? pair.split('_') : pair.split('/');
 
-  // Determinar qual camada foi atingida
+  // 1. Priorizar notificação baseada na camada real da Grade Gaussiana configurada
+  if (resultadoCamadas && resultadoCamadas.camadaAtualIndex !== null && latestSpread !== undefined) {
+    const camadaIndex = resultadoCamadas.camadaAtualIndex;
+    const sugestao = resultadoCamadas.camadaAtualSugestao || '';
+    
+    // Se está em camada extrema ou fora das bandas (ex: < spreadMin ou > spreadMax)
+    const isExtremo = latestSpread < resultadoCamadas.spreadMin || latestSpread > resultadoCamadas.spreadMax || camadaIndex === 1 || (resultadoCamadas.camadas && camadaIndex === resultadoCamadas.camadas.length);
+    const isCentro = Math.abs(latestSpread - resultadoCamadas.picoSpreadCenter) <= (resultadoCamadas.step * 0.5);
+
+    if (isExtremo || isCentro) {
+      let title = `⚡ SpreadTrader — Camada #${camadaIndex || 'Extrema'} Atingida`;
+      let body = `${pair}: Spread = R$ ${latestSpread.toFixed(2)} (${signStr}${zScore.toFixed(2)} σ). ${sugestao}`;
+
+      if (operationMode === 'custody_swap') {
+        if (isCentro || absZ <= 0.3) {
+          body = `🏁 Reversão à Média no par ${pair}! Lucro capturado. Pode retornar a custódia original.`;
+        } else if (latestSpread < resultadoCamadas.spreadMin || (camadaIndex && camadaIndex <= 2)) {
+          body = `🔄 Troca de Custódia em Camada Baixa: Vender ${s2 || 'PN'} da carteira → Comprar ${s1 || 'ON'}.`;
+        } else if (latestSpread > resultadoCamadas.spreadMax || (camadaIndex && resultadoCamadas.camadas && camadaIndex >= resultadoCamadas.camadas.length - 1)) {
+          body = `🔄 Troca de Custódia em Camada Alta: Vender ${s1 || 'ON'} da carteira → Comprar ${s2 || 'PN'}.`;
+        }
+      }
+
+      sendNotification(title, body, { tag: `grid-layer-${pair}-${camadaIndex || 'ext'}` });
+      playAlertAudio();
+      return;
+    }
+  }
+
+  // 2. Fallback baseado em limites de Z-Score
   let layerLabel = '';
   let actionLabel = '';
 
@@ -99,5 +142,6 @@ export function checkAndNotify(
     `${pair}: Z-Score = ${signStr}${zScore.toFixed(2)} σ. ${actionLabel}`,
     { tag: `layer-${pair}-${Math.round(absZ * 10)}` }
   );
+  if (absZ >= 1.5 || absZ <= 0.3) playAlertAudio();
 }
 

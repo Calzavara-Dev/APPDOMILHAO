@@ -12,6 +12,7 @@ interface ZScoreThermometerProps {
   spreadValue: number;
   logoUrl1?: string;
   logoUrl2?: string;
+  operationMode?: 'custody_swap' | 'traditional_ls';
 }
 
 export function ZScoreThermometer({
@@ -22,6 +23,7 @@ export function ZScoreThermometer({
   spreadValue,
   logoUrl1,
   logoUrl2,
+  operationMode = 'custody_swap',
 }: ZScoreThermometerProps) {
   const [showGuide, setShowGuide] = useState(false);
 
@@ -44,7 +46,7 @@ export function ZScoreThermometer({
           <div className="flex items-center gap-2 mb-1">
             <Sparkles className="w-5 h-5 text-amber-400" />
             <span className="text-xs font-black uppercase tracking-wider text-amber-400">
-              Termômetro Didático do Spread
+              Termômetro Didático do Spread {operationMode === 'custody_swap' && '• Modo Troca de Custódia (Sem Short)'}
             </span>
           </div>
           <div className="flex items-center gap-2.5 flex-wrap">
@@ -80,6 +82,11 @@ export function ZScoreThermometer({
           <p>
             • Quando passa de <strong>-1.5</strong> ou <strong>+1.5</strong>, o elástico esticou demais: significa que uma ação ficou barata demais ou cara demais em relação à outra e a probabilidade estatística de retornarem à média é muito alta!
           </p>
+          {operationMode === 'custody_swap' && (
+            <p className="text-emerald-300 border-t border-white/10 pt-2 mt-2">
+              • <strong>Troca de Custódia:</strong> Você não faz venda a descoberto (short) nem paga aluguel BTC. Apenas vende a ação que valorizou em custódia e compra a que ficou descontada, acumulando nas camadas até reverter para a média.
+            </p>
+          )}
         </div>
       )}
 
@@ -118,7 +125,7 @@ export function ZScoreThermometer({
           {/* Zona Verde - Compra (-3 a -1.5) -> 25% da barra */}
           <div className="w-1/4 bg-gradient-to-r from-emerald-600 to-emerald-500/60 flex items-center justify-center">
             <span className="text-[9px] sm:text-[11px] font-black text-white uppercase tracking-tighter drop-shadow truncate px-1">
-              🟢 <span className="hidden sm:inline">Comprar</span><span className="sm:hidden">Comp.</span>
+              🟢 <span className="hidden sm:inline">{operationMode === 'custody_swap' ? `Trocar p/ ${stock1Symbol}` : 'Comprar'}</span><span className="sm:hidden">{operationMode === 'custody_swap' ? 'Troca 1' : 'Comp.'}</span>
             </span>
           </div>
           {/* Zona Neutra (-1.5 a +1.5) -> 50% da barra */}
@@ -130,7 +137,7 @@ export function ZScoreThermometer({
           {/* Zona Vermelha - Venda (+1.5 a +3) -> 25% da barra */}
           <div className="w-1/4 bg-gradient-to-r from-rose-500/60 to-rose-600 flex items-center justify-center">
             <span className="text-[9px] sm:text-[11px] font-black text-white uppercase tracking-tighter drop-shadow truncate px-1">
-              🔴 <span className="hidden sm:inline">Vender</span><span className="sm:hidden">Vend.</span>
+              🔴 <span className="hidden sm:inline">{operationMode === 'custody_swap' ? `Trocar p/ ${stock2Symbol}` : 'Vender'}</span><span className="sm:hidden">{operationMode === 'custody_swap' ? 'Troca 2' : 'Vend.'}</span>
             </span>
           </div>
         </div>
@@ -138,9 +145,9 @@ export function ZScoreThermometer({
         {/* Escala Numérica abaixo da barra */}
         <div className="flex justify-between text-[9px] sm:text-[11px] font-mono font-bold text-slate-400 mt-2 px-0.5 sm:px-1">
           <span>-3.0 σ<span className="hidden sm:inline"> (Extremo)</span></span>
-          <span className="text-emerald-400">-1.5 σ<span className="hidden sm:inline"> (Entrada Long)</span></span>
+          <span className="text-emerald-400">-1.5 σ<span className="hidden sm:inline"> ({operationMode === 'custody_swap' ? `Vende ${stock2Symbol} / Compra ${stock1Symbol}` : 'Entrada Long'})</span></span>
           <span className="text-white">0<span className="hidden sm:inline"> (Média)</span></span>
-          <span className="text-rose-400">+1.5 σ<span className="hidden sm:inline"> (Entrada Short)</span></span>
+          <span className="text-rose-400">+1.5 σ<span className="hidden sm:inline"> ({operationMode === 'custody_swap' ? `Vende ${stock1Symbol} / Compra ${stock2Symbol}` : 'Entrada Short'})</span></span>
           <span>+3.0 σ<span className="hidden sm:inline"> (Extremo)</span></span>
         </div>
       </div>
@@ -163,22 +170,36 @@ export function ZScoreThermometer({
             </span>
             <p className="text-sm font-semibold text-slate-100">
               {isBuy ? (
-                <>
-                  O preço de <strong className="text-emerald-400">{stock1Symbol}</strong> caiu bastante em relação a{" "}
-                  <strong>{stock2Symbol}</strong> (esticamento de <strong>{stretchPct}%</strong>). É oportunidade de{" "}
-                  <span className="text-emerald-400 underline">comprar o spread</span> com expectativa de retorno em{" "}
-                  <strong>~{halfLifeDays} dias</strong>.
-                </>
+                operationMode === 'custody_swap' ? (
+                  <>
+                    <strong className="text-emerald-400">{stock1Symbol}</strong> ficou descontada em relação a <strong className="text-violet-400">{stock2Symbol}</strong> (esticamento de <strong>{stretchPct}%</strong>).
+                    No modo Troca de Custódia: <span className="text-emerald-400 font-bold underline">venda {stock2Symbol} que está em custódia e compre {stock1Symbol}</span> sem ficar ponta vendida, aguardando a reversão à média em ~<strong>{halfLifeDays} dias</strong>.
+                  </>
+                ) : (
+                  <>
+                    O preço de <strong className="text-emerald-400">{stock1Symbol}</strong> caiu bastante em relação a{" "}
+                    <strong>{stock2Symbol}</strong> (esticamento de <strong>{stretchPct}%</strong>). É oportunidade de{" "}
+                    <span className="text-emerald-400 underline">comprar o spread</span> com expectativa de retorno em{" "}
+                    <strong>~{halfLifeDays} dias</strong>.
+                  </>
+                )
               ) : isSell ? (
-                <>
-                  O preço de <strong className="text-rose-400">{stock1Symbol}</strong> subiu muito acima do normal em relação a{" "}
-                  <strong>{stock2Symbol}</strong> (esticamento de <strong>{stretchPct}%</strong>). É oportunidade de{" "}
-                  <span className="text-rose-400 underline">vender o spread</span> até que a diferença retorne à média.
-                </>
+                operationMode === 'custody_swap' ? (
+                  <>
+                    <strong className="text-rose-400">{stock1Symbol}</strong> valorizou muito acima do normal contra <strong className="text-violet-400">{stock2Symbol}</strong> (esticamento de <strong>{stretchPct}%</strong>).
+                    No modo Troca de Custódia: <span className="text-rose-400 font-bold underline">venda {stock1Symbol} da sua custódia e compre {stock2Symbol}</span>, sem aluguel ou short, aguardando o retorno à média em ~<strong>{halfLifeDays} dias</strong>.
+                  </>
+                ) : (
+                  <>
+                    O preço de <strong className="text-rose-400">{stock1Symbol}</strong> subiu muito acima do normal em relação a{" "}
+                    <strong>{stock2Symbol}</strong> (esticamento de <strong>{stretchPct}%</strong>). É oportunidade de{" "}
+                    <span className="text-rose-400 underline">vender o spread</span> até que a diferença retorne à média.
+                  </>
+                )
               ) : (
                 <>
                   O par <strong className="text-cyan-300">{stock1Symbol} x {stock2Symbol}</strong> está caminhando dentro da sua{" "}
-                  <strong>faixa normal de preço</strong>. Não há distorção estatística suficiente para abrir nova operação agora.
+                  <strong>faixa normal de equilíbrio</strong>. Não há distorção estatística suficiente para trocar de custódia ou abrir nova operação agora.
                 </>
               )}
             </p>
